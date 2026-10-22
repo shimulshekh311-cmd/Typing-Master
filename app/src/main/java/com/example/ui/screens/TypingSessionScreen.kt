@@ -88,6 +88,7 @@ fun TypingSessionScreen(
     val mistakeCount by viewModel.mistakeCount.collectAsStateWithLifecycle()
     val completedResult by viewModel.lastCompletedResult.collectAsStateWithLifecycle()
     val selectedLanguage by viewModel.selectedLanguage.collectAsStateWithLifecycle()
+    val inputLayoutMode by viewModel.inputLayoutMode.collectAsStateWithLifecycle()
 
     val virtualKeyboardEnabled by viewModel.virtualKeyboardEnabled.collectAsStateWithLifecycle()
     val hapticEnabled by viewModel.hapticEnabled.collectAsStateWithLifecycle()
@@ -121,7 +122,11 @@ fun TypingSessionScreen(
                             maxLines = 1
                         )
                         Text(
-                            text = if (selectedLanguage == TypingLanguage.BANGLA) "বাংলা টাইপিং সেশন" else "English Typing Session",
+                            text = if (selectedLanguage == TypingLanguage.BANGLA) {
+                                if (inputLayoutMode == com.example.data.model.InputLayoutMode.BIJOY) "বাংলা (বিজয় লেআউট - এক্সটার্নাল কিবোর্ড)" else "বাংলা (অভ্র / সাধারণ কিবোর্ড)"
+                            } else {
+                                "English Typing Session"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = if (selectedLanguage == TypingLanguage.BANGLA) VioletSecondary else CyanAccent
                         )
@@ -190,15 +195,27 @@ fun TypingSessionScreen(
                 elapsedSeconds = elapsedSeconds,
                 timeLimitSeconds = timeLimitSeconds,
                 mistakeCount = mistakeCount,
+                language = selectedLanguage,
+                inputLayoutMode = inputLayoutMode,
                 focusRequester = focusRequester,
-                onValueChange = { viewModel.onUserInputChange(it) }
+                onValueChange = { viewModel.onUserInputChange(it) },
+                onPhysicalKey = { char -> viewModel.handlePhysicalKey(char) },
+                onBackspace = { viewModel.handleBackspace() },
+                onToggleLayoutMode = {
+                    viewModel.inputLayoutMode.value = if (inputLayoutMode == com.example.data.model.InputLayoutMode.BIJOY) {
+                        com.example.data.model.InputLayoutMode.AVRO_SYSTEM
+                    } else {
+                        com.example.data.model.InputLayoutMode.BIJOY
+                    }
+                }
             )
 
             // Optional Virtual Keyboard & Finger Guide
             AnimatedVisibility(visible = virtualKeyboardEnabled) {
                 VirtualKeyboardHelper(
                     targetChar = targetChar,
-                    language = selectedLanguage
+                    language = selectedLanguage,
+                    inputLayoutMode = inputLayoutMode
                 )
             }
 

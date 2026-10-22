@@ -44,7 +44,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.datasource.LessonDataSource
+import com.example.data.model.InputLayoutMode
 import com.example.data.model.TypingLanguage
 import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.CyanAccent
@@ -146,6 +148,94 @@ fun SpeedTestScreen(
                     color = CyanAccent,
                     modifier = Modifier.weight(1f)
                 )
+            }
+        }
+
+        // Layout Mode for Bangla Speed Test
+        if (selectedLanguage == TypingLanguage.BANGLA) {
+            item {
+                val currentLayout by viewModel.inputLayoutMode.collectAsStateWithLifecycle()
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    border = CardDefaults.outlinedCardBorder()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "বাংলা টাইপিং লেআউট নির্বাচন:",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { viewModel.inputLayoutMode.value = InputLayoutMode.BIJOY },
+                                color = if (currentLayout == InputLayoutMode.BIJOY) IndigoPrimary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.5.dp,
+                                    if (currentLayout == InputLayoutMode.BIJOY) IndigoPrimary else Color.Transparent
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "⌨️ বিজয় লেআউট",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (currentLayout == InputLayoutMode.BIJOY) IndigoPrimary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "এক্সটার্নাল কিবোর্ড মোড",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 9.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { viewModel.inputLayoutMode.value = InputLayoutMode.AVRO_SYSTEM },
+                                color = if (currentLayout == InputLayoutMode.AVRO_SYSTEM) VioletSecondary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.5.dp,
+                                    if (currentLayout == InputLayoutMode.AVRO_SYSTEM) VioletSecondary else Color.Transparent
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "📱 অভ্র / সাধারণ",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (currentLayout == InputLayoutMode.AVRO_SYSTEM) VioletSecondary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "মোবাইল কিবোর্ড",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 9.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 

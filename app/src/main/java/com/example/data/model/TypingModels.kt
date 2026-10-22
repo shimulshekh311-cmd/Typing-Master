@@ -15,6 +15,11 @@ enum class TypingMode(val titleEn: String, val titleBn: String) {
     CUSTOM("Custom Practice", "নিজস্ব অনুচ্ছেদ")
 }
 
+enum class InputLayoutMode(val labelEn: String, val labelBn: String) {
+    BIJOY("Bijoy Layout (PC / External)", "বিজয় লেআউট (এক্সটার্নাল কিবোর্ড)"),
+    AVRO_SYSTEM("System / Avro Keyboard", "অভ্র / সিস্টেম কিবোর্ড")
+}
+
 enum class Difficulty(val labelEn: String, val labelBn: String) {
     BEGINNER("Beginner", "প্রাথমিক"),
     INTERMEDIATE("Intermediate", "মধ্যবর্তী"),

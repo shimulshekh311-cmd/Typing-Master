@@ -74,6 +74,9 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     private val _mistakeCount = MutableStateFlow(0)
     val mistakeCount: StateFlow<Int> = _mistakeCount.asStateFlow()
 
+    // Input layout for Bangla: Bijoy (PC / External Keyboard) or Avro / System
+    val inputLayoutMode = MutableStateFlow(com.example.data.model.InputLayoutMode.BIJOY)
+
     private val _lastCompletedResult = MutableStateFlow<TypingResult?>(null)
     val lastCompletedResult: StateFlow<TypingResult?> = _lastCompletedResult.asStateFlow()
 
@@ -244,6 +247,28 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         // Check if finished by reaching full text length
         if (sanitized.length >= target.length && target.isNotEmpty()) {
             finishSession()
+        }
+    }
+
+    fun handlePhysicalKey(keyChar: Char) {
+        if (!_isSessionActive.value || _isSessionFinished.value) return
+
+        if (_selectedLanguage.value == TypingLanguage.BANGLA && inputLayoutMode.value == com.example.data.model.InputLayoutMode.BIJOY) {
+            val newText = com.example.data.bijoy.BijoyLayoutEngine.processKeystroke(_userInput.value, keyChar)
+            onUserInputChange(newText)
+        } else {
+            onUserInputChange(_userInput.value + keyChar)
+        }
+    }
+
+    fun handleBackspace() {
+        if (!_isSessionActive.value || _isSessionFinished.value) return
+        if (_userInput.value.isNotEmpty()) {
+            _userInput.value = _userInput.value.dropLast(1)
+            updateLiveMetrics()
+            if (hapticEnabled.value) {
+                triggerKeyHaptic()
+            }
         }
     }
 
