@@ -1,0 +1,6 @@
+{
+  "name": "Typing Master",
+  "description": "Master English and Bengali typing with structured lessons, speed tests, live feedback, scoreboard, and monthly progress graphical reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
