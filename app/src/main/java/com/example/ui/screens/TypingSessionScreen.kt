@@ -101,7 +101,10 @@ fun TypingSessionScreen(
     }
 
     LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
+        kotlinx.coroutines.delay(150)
+        try {
+            focusRequester.requestFocus()
+        } catch (_: Exception) {}
     }
 
     val targetChar = if (userInput.length < targetText.length) {
@@ -229,7 +232,9 @@ fun TypingSessionScreen(
                 OutlinedButton(
                     onClick = {
                         viewModel.resetSession()
-                        focusRequester.requestFocus()
+                        try {
+                            focusRequester.requestFocus()
+                        } catch (_: Exception) {}
                     },
                     modifier = Modifier
                         .weight(1f)
@@ -403,7 +408,9 @@ fun TypingSessionScreen(
                     onClick = {
                         viewModel.dismissResultDialog()
                         viewModel.resetSession()
-                        focusRequester.requestFocus()
+                        try {
+                            focusRequester.requestFocus()
+                        } catch (_: Exception) {}
                     },
                     modifier = Modifier.testTag("result_dialog_try_again_button")
                 ) {

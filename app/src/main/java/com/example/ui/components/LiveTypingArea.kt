@@ -96,11 +96,17 @@ fun LiveTypingDisplay(
 
     // By default, external keyboard mode is ON (no soft keyboard popping up)
     var useSoftwareKeyboard by remember { mutableStateOf(false) }
+    val softKeyboardFocusRequester = remember { FocusRequester() }
 
     // If external keyboard mode is active, keep software keyboard hidden
     LaunchedEffect(useSoftwareKeyboard) {
         if (!useSoftwareKeyboard) {
             keyboardController?.hide()
+        } else {
+            kotlinx.coroutines.delay(100)
+            try {
+                softKeyboardFocusRequester.requestFocus()
+            } catch (_: Exception) {}
         }
     }
 
@@ -217,8 +223,11 @@ fun LiveTypingDisplay(
         val onSurfaceColor = MaterialTheme.colorScheme.onSurface
 
         val annotatedText = buildAnnotatedString {
-            val targetWords = targetText.split(" ")
-            val typedWords = userInput.split(" ")
+            if (targetText.isBlank()) {
+                return@buildAnnotatedString
+            }
+            val targetWords = targetText.trim().split(Regex("\\s+"))
+            val typedWords = if (userInput.isEmpty()) emptyList() else userInput.split(Regex("\\s+"))
             val currentWordIndex = (typedWords.size - 1).coerceAtLeast(0)
 
             targetWords.forEachIndexed { index, word ->
@@ -271,9 +280,9 @@ fun LiveTypingDisplay(
                 .fillMaxWidth()
                 .height(180.dp)
                 .clickable {
-                    if (useSoftwareKeyboard) {
+                    try {
                         focusRequester.requestFocus()
-                    }
+                    } catch (_: Exception) {}
                 }
                 .testTag("typing_display_card"),
             shape = RoundedCornerShape(16.dp),
@@ -304,7 +313,13 @@ fun LiveTypingDisplay(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
+                .focusRequester(focusRequester)
                 .focusable()
+                .clickable {
+                    try {
+                        focusRequester.requestFocus()
+                    } catch (_: Exception) {}
+                }
                 .onPreviewKeyEvent { keyEvent ->
                     if (keyEvent.type == KeyEventType.KeyDown) {
                         val nativeEvent = keyEvent.nativeKeyEvent
@@ -389,7 +404,7 @@ fun LiveTypingDisplay(
                         .clip(RoundedCornerShape(10.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                         .padding(horizontal = 12.dp, vertical = 10.dp)
-                        .focusRequester(focusRequester),
+                        .focusRequester(softKeyboardFocusRequester),
                     textStyle = MaterialTheme.typography.bodyMedium.copy(
                         color = MaterialTheme.colorScheme.onSurface
                     ),
