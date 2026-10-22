@@ -272,6 +272,41 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun onPhysicalKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (!_isSessionActive.value || _isSessionFinished.value) return false
+
+        val keyCode = event.keyCode
+
+        if (keyCode == android.view.KeyEvent.KEYCODE_DEL) {
+            handleBackspace()
+            return true
+        }
+
+        if (keyCode == android.view.KeyEvent.KEYCODE_SPACE) {
+            if (_selectedLanguage.value == TypingLanguage.BANGLA && inputLayoutMode.value == com.example.data.model.InputLayoutMode.BIJOY) {
+                handlePhysicalKey(' ')
+            } else {
+                onUserInputChange(_userInput.value + " ")
+            }
+            return true
+        }
+
+        val unicodeChar = event.getUnicodeChar(event.metaState)
+        if (unicodeChar != 0) {
+            val char = unicodeChar.toChar()
+            if (char in 'a'..'z' || char in 'A'..'Z' || char in "0123456789.,;:'\"/\\`~!@#$%^&*()-=_+[]{}|<>?") {
+                if (_selectedLanguage.value == TypingLanguage.BANGLA && inputLayoutMode.value == com.example.data.model.InputLayoutMode.BIJOY) {
+                    handlePhysicalKey(char)
+                } else {
+                    onUserInputChange(_userInput.value + char)
+                }
+                return true
+            }
+        }
+
+        return false
+    }
+
     private fun triggerKeyHaptic() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

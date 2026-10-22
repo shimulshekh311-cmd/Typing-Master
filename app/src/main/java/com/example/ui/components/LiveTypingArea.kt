@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.KeyboardHide
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Card
@@ -32,6 +34,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +51,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -53,6 +61,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.bijoy.BijoyLayoutEngine
 import com.example.data.model.InputLayoutMode
 import com.example.data.model.TypingLanguage
 import com.example.ui.theme.AmberWarning
@@ -83,9 +92,20 @@ fun LiveTypingDisplay(
 ) {
     val scrollState = rememberScrollState()
     val isBanglaBijoy = language == TypingLanguage.BANGLA && inputLayoutMode == InputLayoutMode.BIJOY
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    // By default, external keyboard mode is ON (no soft keyboard popping up)
+    var useSoftwareKeyboard by remember { mutableStateOf(false) }
+
+    // If external keyboard mode is active, keep software keyboard hidden
+    LaunchedEffect(useSoftwareKeyboard) {
+        if (!useSoftwareKeyboard) {
+            keyboardController?.hide()
+        }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
-        // Real-time HUD (Heads-Up Display)
+        // Real-time HUD (WPM, Accuracy, Time, Errors)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -132,109 +152,116 @@ fun LiveTypingDisplay(
             )
         }
 
-        // External Keyboard & Layout Mode Indicator Bar
-        if (language == TypingLanguage.BANGLA) {
-            Surface(
+        // Mode Status Bar: External Keyboard with Bijoy Auto-Convert
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = if (isBanglaBijoy) IndigoPrimary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (isBanglaBijoy) IndigoPrimary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+            )
+        ) {
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp)
-                    .clickable { onToggleLayoutMode() },
-                shape = RoundedCornerShape(10.dp),
-                color = if (isBanglaBijoy) IndigoPrimary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    if (isBanglaBijoy) IndigoPrimary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                )
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Keyboard,
-                            contentDescription = "Keyboard Mode",
-                            tint = if (isBanglaBijoy) IndigoPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isBanglaBijoy) "⌨️ এক্সটার্নাল কিবোর্ড মোড: বিজয় লেআউট সক্রিয়" else "📱 সিস্টেম / অভ্র কিবোর্ড মোড",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isBanglaBijoy) IndigoPrimary else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Keyboard,
+                        contentDescription = "External Keyboard",
+                        tint = if (isBanglaBijoy) IndigoPrimary else CyanAccent,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "মোড পরিবর্তন ⇄",
+                        text = if (language == TypingLanguage.BANGLA) {
+                            if (isBanglaBijoy) "⌨️ এক্সটার্নাল কিবোর্ড (বিজয় কনভার্টার চালু)" else "📱 অভ্র / সফটওয়্যার মোড"
+                        } else {
+                            "⌨️ এক্সটার্নাল কিবোর্ড (ইংরেজি QWERTY)"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isBanglaBijoy) IndigoPrimary else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                // Soft Keyboard toggle (keeps Gboard off by default)
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                    modifier = Modifier.clickable {
+                        useSoftwareKeyboard = !useSoftwareKeyboard
+                        if (!useSoftwareKeyboard) {
+                            keyboardController?.hide()
+                        }
+                    }
+                ) {
+                    Text(
+                        text = if (useSoftwareKeyboard) "সফট কিবোর্ড বন্ধ করুন" else "সফট কিবোর্ড চালু",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall,
-                        color = CyanAccent,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        color = CyanAccent
                     )
                 }
             }
         }
 
-        // Pristine Target Text Card (Rendered via AnnotatedString to prevent script breaking!)
+        // Target Reading Area: Formatted at Word Boundaries to 100% prevent script fragmentation
         val onSurfaceColor = MaterialTheme.colorScheme.onSurface
 
         val annotatedText = buildAnnotatedString {
-            val inputLen = userInput.length
-            val targetLen = targetText.length
+            val targetWords = targetText.split(" ")
+            val typedWords = userInput.split(" ")
+            val currentWordIndex = (typedWords.size - 1).coerceAtLeast(0)
 
-            for (i in 0 until targetLen) {
-                val targetChar = targetText[i]
+            targetWords.forEachIndexed { index, word ->
                 when {
-                    i < inputLen -> {
-                        val isCorrect = userInput[i] == targetChar
-                        if (isCorrect) {
-                            withStyle(
-                                SpanStyle(
-                                    color = EmeraldSuccess,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            ) {
-                                append(targetChar)
-                            }
-                        } else {
-                            withStyle(
-                                SpanStyle(
-                                    color = RoseError,
-                                    background = RoseError.copy(alpha = 0.25f),
-                                    textDecoration = TextDecoration.Underline,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            ) {
-                                append(targetChar)
-                            }
+                    index < currentWordIndex -> {
+                        val isCorrect = index < typedWords.size && typedWords[index] == word
+                        val color = if (isCorrect) EmeraldSuccess else RoseError
+                        withStyle(
+                            SpanStyle(
+                                color = color,
+                                fontWeight = FontWeight.SemiBold,
+                                textDecoration = if (isCorrect) TextDecoration.None else TextDecoration.Underline
+                            )
+                        ) {
+                            append(word)
                         }
                     }
-                    i == inputLen -> {
-                        // Current active cursor position
+                    index == currentWordIndex -> {
+                        // Current word being typed (highlighted whole without internal breaks)
                         withStyle(
                             SpanStyle(
                                 color = CyanAccent,
-                                background = CyanAccent.copy(alpha = 0.3f),
+                                background = CyanAccent.copy(alpha = 0.28f),
                                 fontWeight = FontWeight.Bold
                             )
                         ) {
-                            append(targetChar)
+                            append(word)
                         }
                     }
                     else -> {
+                        // Upcoming text in pristine typography
                         withStyle(
                             SpanStyle(
                                 color = onSurfaceColor.copy(alpha = 0.6f),
                                 fontWeight = FontWeight.Normal
                             )
                         ) {
-                            append(targetChar)
+                            append(word)
                         }
                     }
+                }
+                if (index < targetWords.size - 1) {
+                    append(" ")
                 }
             }
         }
@@ -243,7 +270,11 @@ fun LiveTypingDisplay(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(180.dp)
-                .clickable { focusRequester.requestFocus() }
+                .clickable {
+                    if (useSoftwareKeyboard) {
+                        focusRequester.requestFocus()
+                    }
+                }
                 .testTag("typing_display_card"),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
@@ -267,80 +298,120 @@ fun LiveTypingDisplay(
             }
         }
 
-        // Input Field that intercepts both Physical External Keyboard events and IME software input
-        Box(
+        // Active Typing Box (Displays typed text with real-time feedback)
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 10.dp)
-        ) {
-            BasicTextField(
-                value = userInput,
-                onValueChange = { newValue ->
-                    // When in Bijoy physical keyboard mode, hardware keys are intercepted by onPreviewKeyEvent.
-                    // But if the user is using on-screen keyboard, onValueChange handles it seamlessly!
-                    onValueChange(newValue)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(
-                        1.5.dp,
-                        if (isBanglaBijoy) IndigoPrimary.copy(alpha = 0.8f) else CyanAccent.copy(alpha = 0.6f),
-                        RoundedCornerShape(12.dp)
-                    )
-                    .padding(horizontal = 14.dp, vertical = 12.dp)
-                    .focusRequester(focusRequester)
-                    .onPreviewKeyEvent { keyEvent ->
-                        if (keyEvent.type == KeyEventType.KeyDown) {
-                            val nativeEvent = keyEvent.nativeKeyEvent
-                            if (keyEvent.key == Key.Backspace) {
-                                if (isBanglaBijoy) {
-                                    onBackspace()
+                .focusable()
+                .onPreviewKeyEvent { keyEvent ->
+                    if (keyEvent.type == KeyEventType.KeyDown) {
+                        val nativeEvent = keyEvent.nativeKeyEvent
+                        if (keyEvent.key == Key.Backspace) {
+                            onBackspace()
+                            return@onPreviewKeyEvent true
+                        } else if (keyEvent.key == Key.Spacebar) {
+                            onPhysicalKey(' ')
+                            return@onPreviewKeyEvent true
+                        } else {
+                            val unicodeChar = nativeEvent.getUnicodeChar(nativeEvent.metaState)
+                            if (unicodeChar != 0) {
+                                val char = unicodeChar.toChar()
+                                if (char in 'a'..'z' || char in 'A'..'Z' || char in "0123456789.,;:'\"/\\`~!@#$%^&*()-=_+[]{}|<>?") {
+                                    onPhysicalKey(char)
                                     return@onPreviewKeyEvent true
-                                }
-                            } else if (keyEvent.key == Key.Spacebar) {
-                                if (isBanglaBijoy) {
-                                    onPhysicalKey(' ')
-                                    return@onPreviewKeyEvent true
-                                }
-                            } else {
-                                val unicodeChar = nativeEvent.getUnicodeChar(nativeEvent.metaState)
-                                if (unicodeChar != 0 && isBanglaBijoy) {
-                                    val char = unicodeChar.toChar()
-                                    if (char in 'a'..'z' || char in 'A'..'Z' || char in "0123456789.,;:'\"/\\`~!@#$%^&*()-=_+[]{}|<>?") {
-                                        onPhysicalKey(char)
-                                        return@onPreviewKeyEvent true
-                                    }
                                 }
                             }
                         }
-                        false
                     }
-                    .testTag("typing_input_field"),
-                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 18.sp
-                ),
-                cursorBrush = SolidColor(if (isBanglaBijoy) IndigoPrimary else CyanAccent),
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Done,
-                    autoCorrectEnabled = false
-                ),
-                decorationBox = { innerTextField ->
-                    Box(contentAlignment = Alignment.CenterStart) {
-                        if (userInput.isEmpty()) {
-                            Text(
-                                text = if (isBanglaBijoy) "এক্সটার্নাল কিবোর্ড দিয়ে বিজয় টাইপিং শুরু করুন..." else "এখানে টাইপ শুরু করুন... (Type here)",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                        }
-                        innerTextField()
+                    false
+                }
+                .testTag("typing_active_box"),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            border = androidx.compose.foundation.BorderStroke(
+                1.5.dp,
+                if (isBanglaBijoy) IndigoPrimary.copy(alpha = 0.8f) else CyanAccent.copy(alpha = 0.8f)
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    if (userInput.isEmpty()) {
+                        Text(
+                            text = if (isBanglaBijoy) "এক্সটার্নাল কিবোর্ড থেকে সরাসরি টাইপ করুন (J=ক, Shift+J=খ)..." else "টাইপিং শুরু করুন...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    } else {
+                        // Display user's currently typed text
+                        Text(
+                            text = userInput,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1
+                        )
                     }
                 }
-            )
+
+                // Blinking cursor dot
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(if (isBanglaBijoy) IndigoPrimary else CyanAccent)
+                )
+            }
+        }
+
+        // Optional Soft Keyboard BasicTextField (Only rendered if user explicitly enabled on-screen keyboard)
+        if (useSoftwareKeyboard) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                BasicTextField(
+                    value = userInput,
+                    onValueChange = onValueChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                        .focusRequester(focusRequester),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    cursorBrush = SolidColor(CyanAccent),
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Done,
+                        autoCorrectEnabled = false
+                    ),
+                    decorationBox = { inner ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (userInput.isEmpty()) {
+                                Text(
+                                    text = "সফটওয়্যার কিবোর্ড দিয়ে লিখুন...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            inner()
+                        }
+                    }
+                )
+            }
         }
     }
 }

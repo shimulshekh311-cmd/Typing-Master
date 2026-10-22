@@ -1,9 +1,10 @@
 package com.example.data.bijoy
 
 /**
- * Bijoy (বিজয়) Keyboard Layout Engine for External and On-Screen Keyboards.
+ * Bijoy (বিজয়) Keyboard Layout Engine for External Physical Keyboards.
  * Converts standard physical QWERTY keystrokes into Bengali Unicode characters
- * following the standard Bijoy / National (জাতীয়) keyboard layout.
+ * following the standard Bijoy / National (জাতীয়) keyboard layout used in
+ * Bangladesh government job typing practical tests.
  */
 object BijoyLayoutEngine {
 
@@ -91,7 +92,7 @@ object BijoyLayoutEngine {
         '$' to "$",
         '%' to "%",
         '^' to "ঁ", // Chandrabindu
-        '&' to "&",
+        '&' to "ঁ",
         '*' to "*",
         '(' to "(",
         ')' to ")"
@@ -218,6 +219,10 @@ object BijoyLayoutEngine {
         }
     }
 
+    /**
+     * Converts a physical keyboard character into Bengali text.
+     * Supports both Unicode typing order (consonant + vowel) and traditional Bijoy pre-kar order (vowel + consonant).
+     */
     fun processKeystroke(currentText: String, keyChar: Char): String {
         if (keyChar == ' ') {
             return currentText + " "
@@ -226,10 +231,12 @@ object BijoyLayoutEngine {
         val lastChar = currentText.lastOrNull()
         val isLastHasant = lastChar == '্'
 
+        // Check if user is typing a full vowel using 'g' + vowel key (e.g. g+f = আ, g+d = ই, etc.)
         if (isLastHasant && gVowelMap.containsKey(keyChar)) {
             val beforeHasant = if (currentText.length >= 2) currentText[currentText.length - 2] else null
             val isBeforeConsonant = beforeHasant != null && isBengaliConsonant(beforeHasant)
 
+            // If it was at start or after a space/punctuation, replace '্' with full vowel
             if (!isBeforeConsonant) {
                 return currentText.dropLast(1) + gVowelMap[keyChar]!!
             }
@@ -241,10 +248,20 @@ object BijoyLayoutEngine {
             unshiftedMap[keyChar] ?: keyChar.toString()
         }
 
+        // Support traditional Bijoy typewriter pre-kar order:
+        // If user typed ি (D), ে (C), ৈ (Shift+C), ো (X), etc., and next types a consonant (e.g. ক),
+        // reorder them into valid Unicode consonant + vowel mark (ক + ি = কি)!
+        if (mapped.isNotEmpty() && isBengaliConsonant(mapped.first()) && lastChar in listOf('ি', 'ে', 'ৈ', 'ো', 'ৌ', 'া', 'ু', 'ূ', 'ৃ')) {
+            val beforeKar = if (currentText.length >= 2) currentText[currentText.length - 2] else null
+            if (beforeKar == null || !isBengaliConsonant(beforeKar)) {
+                return currentText.dropLast(1) + mapped + lastChar
+            }
+        }
+
         return currentText + mapped
     }
 
-    private fun isBengaliConsonant(c: Char): Boolean {
+    fun isBengaliConsonant(c: Char): Boolean {
         return c in '\u0995'..'\u09B9' || c in listOf('ড়', 'ঢ়', 'য়')
     }
 }
