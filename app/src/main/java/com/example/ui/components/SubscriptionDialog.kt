@@ -22,10 +22,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Diamond
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Star
@@ -35,8 +40,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -66,6 +69,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.repository.PaymentMethod
+import com.example.data.repository.PaymentStatus
 import com.example.data.repository.SubscriptionManager
 import com.example.data.repository.SubscriptionState
 import com.example.ui.theme.AmberWarning
@@ -83,13 +87,30 @@ fun SubscriptionDialog(
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val manager = remember { SubscriptionManager.getInstance(context) }
 
     var selectedMethod by remember { mutableStateOf(PaymentMethod.BKASH) }
     var senderPhone by remember { mutableStateOf("") }
     var trxId by remember { mutableStateOf("") }
+    var smsInputText by remember { mutableStateOf("") }
+    var showSmsParser by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
+    var detectedFeedback by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
-    var isSubmitting by remember { mutableStateOf(false) }
+
+    fun processSmsText(text: String) {
+        val parsed = manager.parseSmsOrText(text)
+        if (parsed.isRecognized) {
+            parsed.trxId?.let { trxId = it }
+            parsed.phone?.let { senderPhone = it }
+            parsed.method?.let { selectedMethod = it }
+            detectedFeedback = "✓ SMS থেকে শনাক্ত হয়েছে: TrxID: ${parsed.trxId ?: "N/A"}, নম্বর: ${parsed.phone ?: "N/A"}"
+            errorMessage = null
+        } else {
+            detectedFeedback = "পাস করা লেখায় TrxID বা মোবাইল নম্বর পাওয়া যায়নি।"
+        }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -97,8 +118,8 @@ fun SubscriptionDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .padding(vertical = 24.dp)
+                .fillMaxWidth(0.95f)
+                .padding(vertical = 20.dp)
                 .clip(RoundedCornerShape(24.dp))
                 .border(
                     width = 1.5.dp,
@@ -113,7 +134,7 @@ fun SubscriptionDialog(
                     .padding(20.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                // Top Header Row
+                // Header Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -144,7 +165,7 @@ fun SubscriptionDialog(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "মাসিক মাত্র ৪৫ টাকা",
+                                text = "মাসিক মাত্র ৪৫ টাকা (Send Money)",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = EmeraldSuccess,
                                 fontWeight = FontWeight.Bold
@@ -163,7 +184,7 @@ fun SubscriptionDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Current Subscription / Trial Status Banner
                 Card(
@@ -206,7 +227,7 @@ fun SubscriptionDialog(
                                 text = if (subscriptionState.isSubscribed) {
                                     "মেয়াদ: ${subscriptionState.expiryDateFormatted} (বাকি ${subscriptionState.subscriptionDaysLeft} দিন)"
                                 } else {
-                                    "ফুল অ্যাক্সেস ও সরকারি চাকরি টাইপিং প্র্যাকটিসের জন্য সাবস্ক্রিপশন নিন।"
+                                    "ফুল অ্যাক্সেস ও সরকারি চাকরির স্পিড টেস্টের জন্য সাবস্ক্রিপশন নিন।"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -215,9 +236,9 @@ fun SubscriptionDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Payment Instructions Box
+                // Payment Instruction & Official Numbers Box
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
@@ -233,15 +254,15 @@ fun SubscriptionDialog(
                             fontWeight = FontWeight.Bold,
                             color = CyanAccent
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         Text(
-                            text = "১. বিকাশ বা নগদ অ্যাপে ঢুকে 'Send Money' অপশনে যান।",
+                            text = "১. বিকাশ বা নগদ অ্যাপে ঢুকে 'Send Money' নির্বাচন করুন।",
                             style = MaterialTheme.typography.bodySmall
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "২. নিচের নম্বরে মাসিক ফি ৪৫ টাকা সেন্ড মানি করুন:",
+                            text = "২. নিচের নম্বরে মাসিক ফি ৪৫ টাকা পাঠান:",
                             style = MaterialTheme.typography.bodySmall
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -277,7 +298,7 @@ fun SubscriptionDialog(
                                 Button(
                                     onClick = {
                                         clipboardManager.setText(AnnotatedString(SubscriptionManager.BKASH_NAGAD_NUMBER))
-                                        Toast.makeText(context, "নম্বর কপি করা হয়েছে!", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "নম্বর ${SubscriptionManager.BKASH_NAGAD_NUMBER} কপি হয়েছে!", Toast.LENGTH_SHORT).show()
                                     },
                                     modifier = Modifier.testTag("copy_phone_number_button"),
                                     contentPadding = ButtonDefaults.TextButtonContentPadding,
@@ -297,15 +318,124 @@ fun SubscriptionDialog(
 
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "৩. সেন্ড মানি সম্পন্ন হলে ফিরতি মেসেজের TrxID ও আপনার নম্বর নিচে বসিয়ে 'স্বয়ংক্রিয়ভাবে সক্রিয় করুন' বাটনে চাপুন।",
+                            text = "৩. টাকা পাঠানোর পর ফিরতি SMS এর TrxID নিচে লিখুন অথবা SMS পেস্ট করে অটো-পার্স করুন।",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Payment Method Selector (bKash / Nagad)
+                // SMS Parsing Automation Helper Card (Gemini recommended)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = IndigoPrimary.copy(alpha = 0.08f)
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, IndigoPrimary.copy(alpha = 0.3f))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showSmsParser = !showSmsParser },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = CyanAccent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "⚡ এসএমএস পার্সিং অটোমেশন (SMS Auto-Fill)",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CyanAccent
+                                )
+                            }
+                            Icon(
+                                imageVector = if (showSmsParser) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        AnimatedVisibility(visible = showSmsParser) {
+                            Column(modifier = Modifier.padding(top = 10.dp)) {
+                                Text(
+                                    text = "বিকাশ বা নগদ থেকে আসা পুরো SMS টি কপি করে পেস্ট করুন। অ্যাপ স্বয়ংক্রিয়ভাবে TrxID ও নম্বর শনাক্ত করবে:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                OutlinedTextField(
+                                    value = smsInputText,
+                                    onValueChange = {
+                                        smsInputText = it
+                                        processSmsText(it)
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("sms_raw_input_field"),
+                                    label = { Text("বিকাশ/নগদ ফিরতি SMS এখানে পেস্ট করুন") },
+                                    placeholder = { Text("যেমন: Send Money Tk 45 to 01984251178... TrxID BL83K9M2P1") },
+                                    minLines = 2,
+                                    maxLines = 4,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            val clip = clipboardManager.getText()?.text
+                                            if (!clip.isNullOrBlank()) {
+                                                smsInputText = clip
+                                                processSmsText(clip)
+                                                Toast.makeText(context, "ক্লিপবোর্ড থেকে SMS স্ক্যান সম্পন্ন!", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(context, "ক্লিপবোর্ডে কোনো লেখা পাওয়া যায়নি।", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(imageVector = Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("ক্লিপবোর্ড থেকে নিন", fontSize = 12.sp)
+                                    }
+                                }
+
+                                if (detectedFeedback != null) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = detectedFeedback ?: "",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (detectedFeedback?.startsWith("✓") == true) EmeraldSuccess else AmberWarning,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Payment Method Selector
                 Text(
                     text = "পেমেন্টের মাধ্যম নির্বাচন করুন:",
                     style = MaterialTheme.typography.labelLarge,
@@ -326,7 +456,7 @@ fun SubscriptionDialog(
                             color = if (isSelected) IndigoPrimary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                             border = androidx.compose.foundation.BorderStroke(
                                 1.5.dp,
-                                if (isSelected) IndigoPrimary else Color.Transparent
+                                if (isSelected) CyanAccent else Color.Transparent
                             )
                         ) {
                             Row(
@@ -365,7 +495,7 @@ fun SubscriptionDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // TrxID Input Field
+                // TrxID Input Field (etTrxId as in Gemini's layout)
                 OutlinedTextField(
                     value = trxId,
                     onValueChange = {
@@ -375,8 +505,8 @@ fun SubscriptionDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("trx_id_input"),
-                    label = { Text("ট্রানজেকশন আইডি (TrxID)") },
-                    placeholder = { Text("যেমন: BL83K9M2P1") },
+                    label = { Text("ট্রানজেকশন আইডি (TrxID) লিখুন") },
+                    placeholder = { Text("যেমন: BL83K9M2P1 বা 72K9M1PQ") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -426,7 +556,7 @@ fun SubscriptionDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Auto-Activate Button
+                // Submit Payment Button (btnSubmitPayment as in Gemini's layout)
                 Button(
                     onClick = {
                         val result = onActivate(trxId, senderPhone, selectedMethod)
@@ -442,7 +572,7 @@ fun SubscriptionDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp)
-                        .testTag("auto_activate_subscription_button"),
+                        .testTag("btnSubmitPayment"),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = EmeraldSuccess)
                 ) {
@@ -453,7 +583,7 @@ fun SubscriptionDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "স্বয়ংক্রিয়ভাবে সক্রিয় করুন (Activate Now)",
+                        text = "পেমেন্ট কনফার্ম করুন (Confirm Payment)",
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -461,13 +591,14 @@ fun SubscriptionDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // WhatsApp Business Help & Confirmation Button
+                // WhatsApp Business Help & Instant Confirmation Button (01635586380)
                 OutlinedButton(
                     onClick = {
-                        val message = "আসসালামু আলাইকুম, আমি টাইপিং মাস্টার অ্যাপে সাবস্ক্রিপশন নিয়ে সহায়তা চাই বা ৪৫ টাকা পাঠিয়েছি।\n" +
-                                "মেথড: ${selectedMethod.titleBn}\n" +
+                        val message = "আসসালামু আলাইকুম, আমি টাইপিং মাস্টার অ্যাপে ৪৫ টাকা সাবস্ক্রিপশন ফি পাঠিয়েছি।\n" +
+                                "পেমেন্ট মাধ্যম: ${selectedMethod.titleBn}\n" +
                                 "প্রেরকের নম্বর: ${if (senderPhone.isNotBlank()) senderPhone else "N/A"}\n" +
-                                "TrxID: ${if (trxId.isNotBlank()) trxId else "N/A"}"
+                                "TrxID: ${if (trxId.isNotBlank()) trxId else "N/A"}\n" +
+                                "দয়া করে পেমেন্ট যাচাই করে রেকর্ড কনফার্ম করবেন।"
 
                         try {
                             val encodedMsg = URLEncoder.encode(message, "UTF-8")
@@ -494,17 +625,107 @@ fun SubscriptionDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "💬 WhatsApp-এ সহায়তা ও নিশ্চিতকরণ (01635586380)",
+                        text = "💬 WhatsApp-এ পেমেন্ট কনফার্ম করুন (01635586380)",
                         color = CyanAccent,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Payment History & Saved Database Records (Gemini's database persistence feature)
+                if (subscriptionState.recentPayments.isNotEmpty()) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { showHistory = !showHistory },
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.History,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = CyanAccent
+                                    )
+                                    Text(
+                                        text = "📜 পেমেন্ট ডাটাবেস রেকর্ড (${subscriptionState.recentPayments.size}টি)",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Icon(
+                                    imageVector = if (showHistory) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            AnimatedVisibility(visible = showHistory) {
+                                Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    subscriptionState.recentPayments.forEach { record ->
+                                        Surface(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            border = androidx.compose.foundation.BorderStroke(0.5.dp, IndigoPrimary.copy(alpha = 0.3f))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(8.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column {
+                                                    Text(
+                                                        text = "TrxID: ${record.trxId} (${record.method.titleBn})",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Text(
+                                                        text = "নম্বর: ${record.senderPhone} • ${record.formattedDate}",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = if (record.status == PaymentStatus.APPROVED) EmeraldSuccess.copy(alpha = 0.2f) else AmberWarning.copy(alpha = 0.2f)
+                                                ) {
+                                                    Text(
+                                                        text = record.status.titleBn,
+                                                        color = if (record.status == PaymentStatus.APPROVED) EmeraldSuccess else AmberWarning,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
 
                 Text(
-                    text = "বিঃদ্রঃ পেমেন্ট সংক্রান্ত যেকোনো সমস্যায় আমাদের ফেসবুক পেজ ও হোয়াটসঅ্যাপে সার্বক্ষণিক সেবা পাবেন।",
+                    text = "বিঃদ্রঃ পেমেন্ট সংক্রান্ত যেকোনো সহায়তায় আমাদের হোয়াটসঅ্যাপে (01635586380) সার্বক্ষণিক যোগাযোগ করতে পারেন।",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

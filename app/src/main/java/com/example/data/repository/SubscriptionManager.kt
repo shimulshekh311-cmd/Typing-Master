@@ -5,9 +5,12 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import kotlin.math.ceil
 import kotlin.math.max
 
@@ -15,6 +18,30 @@ enum class PaymentMethod(val displayName: String, val titleBn: String) {
     BKASH("bKash", "বিকাশ"),
     NAGAD("Nagad", "নগদ")
 }
+
+enum class PaymentStatus(val code: String, val titleBn: String) {
+    PENDING("pending", "যাচাইকরণাধীন"),
+    APPROVED("approved", "অনুমোদিত ও সক্রিয়")
+}
+
+data class PaymentRecord(
+    val id: String = UUID.randomUUID().toString(),
+    val trxId: String,
+    val senderPhone: String,
+    val method: PaymentMethod,
+    val amountBdt: Int = 45,
+    val timestamp: Long = System.currentTimeMillis(),
+    val status: PaymentStatus = PaymentStatus.APPROVED,
+    val formattedDate: String = ""
+)
+
+data class SmsParseResult(
+    val trxId: String? = null,
+    val phone: String? = null,
+    val method: PaymentMethod? = null,
+    val amount: Int? = null,
+    val isRecognized: Boolean = false
+)
 
 data class SubscriptionState(
     val isSubscribed: Boolean = false,
@@ -25,7 +52,8 @@ data class SubscriptionState(
     val statusMessageBn: String = "",
     val activeTrxId: String? = null,
     val senderPhone: String? = null,
-    val paymentMethod: String? = null
+    val paymentMethod: String? = null,
+    val recentPayments: List<PaymentRecord> = emptyList()
 )
 
 class SubscriptionManager private constructor(context: Context) {
@@ -61,6 +89,63 @@ class SubscriptionManager private constructor(context: Context) {
         refreshState()
     }
 
+    fun getPaymentRecords(): List<PaymentRecord> {
+        val jsonStr = prefs.getString(KEY_PAYMENT_RECORDS_JSON, null) ?: return emptyList()
+        val records = mutableListOf<PaymentRecord>()
+        val dateFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale("bn", "BD"))
+        try {
+            val array = JSONArray(jsonStr)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val ts = obj.optLong("timestamp", System.currentTimeMillis())
+                records.add(
+                    PaymentRecord(
+                        id = obj.optString("id", UUID.randomUUID().toString()),
+                        trxId = obj.optString("trxId", ""),
+                        senderPhone = obj.optString("senderPhone", ""),
+                        method = try {
+                            PaymentMethod.valueOf(obj.optString("method", "BKASH"))
+                        } catch (_: Exception) {
+                            PaymentMethod.BKASH
+                        },
+                        amountBdt = obj.optInt("amountBdt", 45),
+                        timestamp = ts,
+                        status = try {
+                            PaymentStatus.valueOf(obj.optString("status", "APPROVED"))
+                        } catch (_: Exception) {
+                            PaymentStatus.APPROVED
+                        },
+                        formattedDate = dateFormat.format(Date(ts))
+                    )
+                )
+            }
+        } catch (_: Exception) {
+            return emptyList()
+        }
+        return records.sortedByDescending { it.timestamp }
+    }
+
+    private fun savePaymentRecord(record: PaymentRecord) {
+        val currentRecords = getPaymentRecords().toMutableList()
+        currentRecords.removeAll { it.trxId.equals(record.trxId, ignoreCase = true) }
+        currentRecords.add(0, record)
+
+        val array = JSONArray()
+        for (r in currentRecords.take(20)) { // keep last 20 records
+            val obj = JSONObject().apply {
+                put("id", r.id)
+                put("trxId", r.trxId)
+                put("senderPhone", r.senderPhone)
+                put("method", r.method.name)
+                put("amountBdt", r.amountBdt)
+                put("timestamp", r.timestamp)
+                put("status", r.status.name)
+            }
+            array.put(obj)
+        }
+        prefs.edit().putString(KEY_PAYMENT_RECORDS_JSON, array.toString()).apply()
+    }
+
     private fun calculateCurrentState(): SubscriptionState {
         val now = System.currentTimeMillis()
         val firstLaunch = prefs.getLong(KEY_FIRST_LAUNCH_TIME, now)
@@ -69,6 +154,7 @@ class SubscriptionManager private constructor(context: Context) {
         val isSubscribed = premiumExpiry > now
 
         val dateFormat = SimpleDateFormat("dd MMMM yyyy", Locale("bn", "BD"))
+        val records = getPaymentRecords()
 
         if (isSubscribed) {
             val daysLeft = max(1, ceil((premiumExpiry - now) / (24f * 60 * 60 * 1000f)).toInt())
@@ -82,7 +168,8 @@ class SubscriptionManager private constructor(context: Context) {
                 statusMessageBn = "⭐ প্রিমিয়াম সদস্য (মেয়াদ: $expiryDateStr পর্যন্ত, বাকি $daysLeft দিন)",
                 activeTrxId = prefs.getString(KEY_ACTIVE_TRX_ID, null),
                 senderPhone = prefs.getString(KEY_SENDER_PHONE, null),
-                paymentMethod = prefs.getString(KEY_PAYMENT_METHOD, null)
+                paymentMethod = prefs.getString(KEY_PAYMENT_METHOD, null),
+                recentPayments = records
             )
         }
 
@@ -99,7 +186,8 @@ class SubscriptionManager private constructor(context: Context) {
                 statusMessageBn = "🎁 ৭ দিনের ফ্রি ট্রায়াল চলছে (বাকি $daysLeft দিন • মেয়াদ: $trialEndStr)",
                 activeTrxId = null,
                 senderPhone = null,
-                paymentMethod = null
+                paymentMethod = null,
+                recentPayments = records
             )
         }
 
@@ -113,12 +201,66 @@ class SubscriptionManager private constructor(context: Context) {
             statusMessageBn = "⚠️ ফ্রি ট্রায়ালের মেয়াদ শেষ! ফুল অ্যাক্সেস পেতে মাসিক ৪৫ টাকা সাবস্ক্রিপশন নিন।",
             activeTrxId = null,
             senderPhone = null,
-            paymentMethod = null
+            paymentMethod = null,
+            recentPayments = records
         )
     }
 
     /**
-     * Instantly activates a 30-day subscription when user provides TrxID and Phone
+     * SMS and Clipboard text parser: extracts TrxID, Phone number, Payment Method, and amount
+     */
+    fun parseSmsOrText(rawText: String): SmsParseResult {
+        val clean = rawText.trim()
+        if (clean.isBlank()) return SmsParseResult()
+
+        // 1. TrxID regex detection (bKash "TrxID BL83K9M2P1", Nagad "TxnId: 72K9M1PQ", etc.)
+        val trxRegex = Regex("""(?i)(?:TrxID|TxnId|TxId|TransID|Trx\s*Id)[\s:]*([A-Za-z0-9]{6,16})""")
+        val trxMatch = trxRegex.find(clean)?.groupValues?.getOrNull(1)
+
+        // Fallback: If user pasted only the TrxID or alphanumeric token (e.g. BL83K9M2P1)
+        val fallbackTrx = if (trxMatch == null) {
+            val words = clean.split(Regex("""[\s,.:;!]+"""))
+            words.firstOrNull { token ->
+                token.length in 7..14 &&
+                        token.any { it.isDigit() } &&
+                        token.any { it.isLetter() } &&
+                        token.all { it.isLetterOrDigit() }
+            }
+        } else null
+
+        val resolvedTrx = trxMatch ?: fallbackTrx
+
+        // 2. Phone detection (e.g. 017..., 019...)
+        val phoneRegex = Regex("""01[3-9]\d{8}""")
+        val phoneMatches = phoneRegex.findAll(clean).map { it.value }.toList()
+        // If the merchant number 01984251178 is present, pick the customer/sender phone if available
+        val senderPhone = phoneMatches.firstOrNull { it != BKASH_NAGAD_NUMBER } ?: phoneMatches.firstOrNull()
+
+        // 3. Payment method detection
+        val detectedMethod = when {
+            clean.contains("nagad", ignoreCase = true) || clean.contains("নগদ") || clean.contains("txnid", ignoreCase = true) -> PaymentMethod.NAGAD
+            clean.contains("bkash", ignoreCase = true) || clean.contains("বিকাশ") || clean.contains("trxid", ignoreCase = true) -> PaymentMethod.BKASH
+            else -> null
+        }
+
+        // 4. Amount detection
+        val amountRegex = Regex("""(?i)(?:Tk|BDT|টাকা)[\s.:]*([0-9]{2,4})""")
+        val amountMatch = amountRegex.find(clean)?.groupValues?.getOrNull(1)?.toIntOrNull()
+
+        val isRecognized = resolvedTrx != null || senderPhone != null
+
+        return SmsParseResult(
+            trxId = resolvedTrx?.uppercase(),
+            phone = senderPhone,
+            method = detectedMethod,
+            amount = amountMatch ?: SUBSCRIPTION_FEE_BDT,
+            isRecognized = isRecognized
+        )
+    }
+
+    /**
+     * Instantly activates a 30-day subscription when user provides TrxID and Phone,
+     * saving the payment record into local database storage.
      */
     fun activateSubscriptionWithTrxId(
         trxId: String,
@@ -156,8 +298,21 @@ class SubscriptionManager private constructor(context: Context) {
             .putStringSet(KEY_USED_TRX_IDS, usedTrxIds)
             .apply()
 
+        // Create and save payment database record
+        val dateFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale("bn", "BD"))
+        val record = PaymentRecord(
+            trxId = cleanTrxId,
+            senderPhone = cleanPhone,
+            method = method,
+            amountBdt = SUBSCRIPTION_FEE_BDT,
+            timestamp = now,
+            status = PaymentStatus.APPROVED,
+            formattedDate = dateFormat.format(Date(now))
+        )
+        savePaymentRecord(record)
+
         refreshState()
-        return Pair(true, "অভিনন্দন! আপনার ৩০ দিনের প্রিমিয়াম সাবস্ক্রিপশন সফলভাবে সক্রিয় হয়েছে।")
+        return Pair(true, "অভিনন্দন! আপনার TrxID ($cleanTrxId) গ্রহণ করা হয়েছে এবং ৩০ দিনের প্রিমিয়াম অ্যাক্সেস সক্রিয় হয়েছে।")
     }
 
     /**
@@ -183,6 +338,7 @@ class SubscriptionManager private constructor(context: Context) {
         const val KEY_SENDER_PHONE = "key_sender_phone"
         const val KEY_PAYMENT_METHOD = "key_payment_method"
         const val KEY_USED_TRX_IDS = "key_used_trx_ids"
+        const val KEY_PAYMENT_RECORDS_JSON = "key_payment_records_json"
 
         const val BKASH_NAGAD_NUMBER = "01984251178"
         const val WHATSAPP_NUMBER = "01635586380"
@@ -200,3 +356,4 @@ class SubscriptionManager private constructor(context: Context) {
         }
     }
 }
+

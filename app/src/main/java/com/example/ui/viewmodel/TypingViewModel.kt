@@ -58,6 +58,10 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         return subscriptionManager.activateSubscriptionWithTrxId(trxId, senderPhone, method)
     }
 
+    fun parseSmsOrClipboard(text: String) = subscriptionManager.parseSmsOrText(text)
+
+    fun getPaymentRecords() = subscriptionManager.getPaymentRecords()
+
     init {
         val db = TypingDatabase.getDatabase(application)
         repository = TypingRepository(db.typingResultDao())
