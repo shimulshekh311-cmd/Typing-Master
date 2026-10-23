@@ -77,6 +77,17 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     // Input layout for Bangla: Bijoy (PC / External Keyboard) or Avro / System
     val inputLayoutMode = MutableStateFlow(com.example.data.model.InputLayoutMode.BIJOY)
 
+    // Paper Copy / Blind Typing Mode (typing from external physical paper with full-screen typing box)
+    val isPaperMode = MutableStateFlow(false)
+
+    fun togglePaperMode() {
+        isPaperMode.value = !isPaperMode.value
+    }
+
+    fun setPaperMode(enabled: Boolean) {
+        isPaperMode.value = enabled
+    }
+
     private val _lastCompletedResult = MutableStateFlow<TypingResult?>(null)
     val lastCompletedResult: StateFlow<TypingResult?> = _lastCompletedResult.asStateFlow()
 
@@ -233,8 +244,12 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         if (!_isSessionActive.value || _isSessionFinished.value) return
 
         val target = _targetText.value
-        // Don't allow typing beyond target length
-        val sanitized = if (newText.length > target.length) newText.take(target.length) else newText
+        // If in Paper Mode, do not cap by target.length - allow full continuous transcription from physical paper
+        val sanitized = if (isPaperMode.value || target.isEmpty()) {
+            newText
+        } else {
+            if (newText.length > target.length) newText.take(target.length) else newText
+        }
 
         // Play subtle haptic feedback on keypress
         if (hapticEnabled.value && sanitized.length > _userInput.value.length) {
@@ -244,14 +259,19 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         _userInput.value = sanitized
         updateLiveMetrics()
 
-        // Check if finished by reaching full text length
-        if (sanitized.length >= target.length && target.isNotEmpty()) {
+        // Check if finished by reaching full text length (only in standard on-screen sample mode)
+        if (!isPaperMode.value && target.isNotEmpty() && sanitized.length >= target.length) {
             finishSession()
         }
     }
 
     fun handlePhysicalKey(keyChar: Char) {
         if (!_isSessionActive.value || _isSessionFinished.value) return
+
+        if (keyChar == '\n') {
+            onUserInputChange(_userInput.value + "\n")
+            return
+        }
 
         if (_selectedLanguage.value == TypingLanguage.BANGLA && inputLayoutMode.value == com.example.data.model.InputLayoutMode.BIJOY) {
             val newText = com.example.data.bijoy.BijoyLayoutEngine.processKeystroke(_userInput.value, keyChar)
@@ -291,10 +311,15 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
             return true
         }
 
+        if (keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER) {
+            onUserInputChange(_userInput.value + "\n")
+            return true
+        }
+
         val unicodeChar = event.getUnicodeChar(event.metaState)
         if (unicodeChar != 0) {
             val char = unicodeChar.toChar()
-            if (char in 'a'..'z' || char in 'A'..'Z' || char in "0123456789.,;:'\"/\\`~!@#$%^&*()-=_+[]{}|<>?") {
+            if (char in 'a'..'z' || char in 'A'..'Z' || char in "0123456789.,;:'\"/\\`~!@#$%^&*()-=_+[]{}|<>?\n") {
                 if (_selectedLanguage.value == TypingLanguage.BANGLA && inputLayoutMode.value == com.example.data.model.InputLayoutMode.BIJOY) {
                     handlePhysicalKey(char)
                 } else {
@@ -321,36 +346,69 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     private fun updateLiveMetrics() {
         val target = _targetText.value
         val input = _userInput.value
-
-        var mistakes = 0
-        val minLen = minOf(target.length, input.length)
-        for (i in 0 until minLen) {
-            if (target[i] != input[i]) {
-                mistakes++
-            }
-        }
-        _mistakeCount.value = mistakes
-
         val totalTyped = input.length
-        val correctChars = (totalTyped - mistakes).coerceAtLeast(0)
-
-        // Accuracy calculation
-        val accuracy = if (totalTyped > 0) {
-            ((correctChars.toFloat() / totalTyped.toFloat()) * 100f).coerceIn(0f, 100f)
-        } else {
-            100f
-        }
-        _liveAccuracy.value = accuracy
-
-        // WPM calculation: 1 word = 5 characters
         val elapsedSec = _elapsedSeconds.value.coerceAtLeast(1)
         val minutes = elapsedSec / 60.0f
-        val wpm = if (minutes > 0f) {
-            ((correctChars / 5.0f) / minutes).toInt().coerceAtLeast(0)
+
+        if (isPaperMode.value) {
+            // Paper Copy Mode: transcribe from physical paper
+            var mistakes = 0
+            if (target.isNotEmpty()) {
+                val minLen = minOf(target.length, input.length)
+                for (i in 0 until minLen) {
+                    if (target[i] != input[i]) {
+                        mistakes++
+                    }
+                }
+            }
+            _mistakeCount.value = mistakes
+
+            val correctChars = (totalTyped - mistakes).coerceAtLeast(0)
+            val accuracy = if (totalTyped > 0) {
+                if (target.isNotEmpty()) {
+                    ((correctChars.toFloat() / totalTyped.toFloat()) * 100f).coerceIn(0f, 100f)
+                } else {
+                    100f
+                }
+            } else {
+                100f
+            }
+            _liveAccuracy.value = accuracy
+
+            val wpm = if (minutes > 0f) {
+                ((totalTyped / 5.0f) / minutes).toInt().coerceAtLeast(0)
+            } else {
+                0
+            }
+            _liveWpm.value = wpm
         } else {
-            0
+            var mistakes = 0
+            val minLen = minOf(target.length, input.length)
+            for (i in 0 until minLen) {
+                if (target[i] != input[i]) {
+                    mistakes++
+                }
+            }
+            _mistakeCount.value = mistakes
+
+            val correctChars = (totalTyped - mistakes).coerceAtLeast(0)
+
+            // Accuracy calculation
+            val accuracy = if (totalTyped > 0) {
+                ((correctChars.toFloat() / totalTyped.toFloat()) * 100f).coerceIn(0f, 100f)
+            } else {
+                100f
+            }
+            _liveAccuracy.value = accuracy
+
+            // WPM calculation: 1 word = 5 characters
+            val wpm = if (minutes > 0f) {
+                ((correctChars / 5.0f) / minutes).toInt().coerceAtLeast(0)
+            } else {
+                0
+            }
+            _liveWpm.value = wpm
         }
-        _liveWpm.value = wpm
     }
 
     fun finishSession() {

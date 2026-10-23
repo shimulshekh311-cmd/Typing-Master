@@ -28,4 +28,19 @@ class ExampleRobolectricTest {
     assertTrue(LessonDataSource.speedTestParagraphsBangla.isNotEmpty())
     assertTrue(LessonDataSource.speedTestParagraphsEnglish.isNotEmpty())
   }
+
+  @Test
+  fun `verify bijoy layout keystroke converts j to bangla ko and shift-j to kho`() {
+    val ko = com.example.data.bijoy.BijoyLayoutEngine.processKeystroke("", 'j')
+    assertEquals("ক", ko)
+
+    val kho = com.example.data.bijoy.BijoyLayoutEngine.processKeystroke("", 'J')
+    assertEquals("খ", kho)
+  }
+
+  @Test
+  fun `verify bijoy layout handles newline enter correctly`() {
+    val textWithNewline = com.example.data.bijoy.BijoyLayoutEngine.processKeystroke("ক", '\n')
+    assertEquals("ক\n", textWithNewline)
+  }
 }

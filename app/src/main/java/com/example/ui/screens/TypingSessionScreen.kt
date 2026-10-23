@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Keyboard
@@ -89,6 +90,7 @@ fun TypingSessionScreen(
     val completedResult by viewModel.lastCompletedResult.collectAsStateWithLifecycle()
     val selectedLanguage by viewModel.selectedLanguage.collectAsStateWithLifecycle()
     val inputLayoutMode by viewModel.inputLayoutMode.collectAsStateWithLifecycle()
+    val isPaperMode by viewModel.isPaperMode.collectAsStateWithLifecycle()
 
     val virtualKeyboardEnabled by viewModel.virtualKeyboardEnabled.collectAsStateWithLifecycle()
     val hapticEnabled by viewModel.hapticEnabled.collectAsStateWithLifecycle()
@@ -119,7 +121,7 @@ fun TypingSessionScreen(
                 title = {
                     Column {
                         Text(
-                            text = sessionTitle,
+                            text = if (isPaperMode) "কাগজ দেখে টাইপিং" else sessionTitle,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1
@@ -147,6 +149,20 @@ fun TypingSessionScreen(
                     }
                 },
                 actions = {
+                    // Toggle Paper Copy Mode / Split Screen Mode
+                    IconButton(
+                        onClick = {
+                            viewModel.togglePaperMode()
+                        },
+                        modifier = Modifier.testTag("toggle_paper_mode_action_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Article,
+                            contentDescription = "Toggle Paper Mode",
+                            tint = if (isPaperMode) CyanAccent else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     // Toggle Virtual Keyboard
                     IconButton(
                         onClick = {
@@ -200,6 +216,8 @@ fun TypingSessionScreen(
                 mistakeCount = mistakeCount,
                 language = selectedLanguage,
                 inputLayoutMode = inputLayoutMode,
+                isPaperMode = isPaperMode,
+                onTogglePaperMode = { viewModel.togglePaperMode() },
                 focusRequester = focusRequester,
                 onValueChange = { viewModel.onUserInputChange(it) },
                 onPhysicalKey = { char -> viewModel.handlePhysicalKey(char) },
@@ -213,8 +231,8 @@ fun TypingSessionScreen(
                 }
             )
 
-            // Optional Virtual Keyboard & Finger Guide
-            AnimatedVisibility(visible = virtualKeyboardEnabled) {
+            // Optional Virtual Keyboard & Finger Guide (only when enabled and not in paper mode)
+            AnimatedVisibility(visible = virtualKeyboardEnabled && !isPaperMode) {
                 VirtualKeyboardHelper(
                     targetChar = targetChar,
                     language = selectedLanguage,
