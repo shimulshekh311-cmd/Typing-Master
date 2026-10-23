@@ -31,6 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ui.components.SubscriptionDialog
 import com.example.ui.navigation.MainDestination
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.MonthlyReportScreen
@@ -74,6 +76,19 @@ enum class ScreenState {
 fun MainAppContent(viewModel: TypingViewModel) {
     var screenState by remember { mutableStateOf(ScreenState.TABS) }
     var currentDestination by remember { mutableStateOf(MainDestination.LEARN) }
+
+    val subscriptionState by viewModel.subscriptionState.collectAsStateWithLifecycle()
+    val showSubscriptionDialog by viewModel.showSubscriptionDialog.collectAsStateWithLifecycle()
+
+    if (showSubscriptionDialog) {
+        SubscriptionDialog(
+            subscriptionState = subscriptionState,
+            onDismiss = { viewModel.closeSubscriptionDialog() },
+            onActivate = { trxId, phone, method ->
+                viewModel.activateSubscription(trxId, phone, method)
+            }
+        )
+    }
 
     if (screenState == ScreenState.ACTIVE_SESSION) {
         TypingSessionScreen(
@@ -138,8 +153,12 @@ fun MainAppContent(viewModel: TypingViewModel) {
                         HomeScreen(
                             viewModel = viewModel,
                             onStartLesson = { lesson ->
-                                viewModel.startLesson(lesson)
-                                screenState = ScreenState.ACTIVE_SESSION
+                                if (!viewModel.canAccessPractice()) {
+                                    viewModel.openSubscriptionDialog()
+                                } else {
+                                    viewModel.startLesson(lesson)
+                                    screenState = ScreenState.ACTIVE_SESSION
+                                }
                             },
                             onNavigateToSpeedTest = {
                                 currentDestination = MainDestination.SPEED_TEST

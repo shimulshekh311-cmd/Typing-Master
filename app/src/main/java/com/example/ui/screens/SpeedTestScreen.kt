@@ -310,9 +310,13 @@ fun SpeedTestScreen(
             Spacer(modifier = Modifier.height(6.dp))
             Button(
                 onClick = {
-                    viewModel.setSelectedLanguage(selectedLanguage)
-                    viewModel.startSpeedTest(selectedDuration, selectedDifficulty)
-                    onStartTest()
+                    if (!viewModel.canAccessPractice()) {
+                        viewModel.openSubscriptionDialog()
+                    } else {
+                        viewModel.setSelectedLanguage(selectedLanguage)
+                        viewModel.startSpeedTest(selectedDuration, selectedDifficulty)
+                        onStartTest()
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()

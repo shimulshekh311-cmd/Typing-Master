@@ -13,6 +13,9 @@ import com.example.data.model.MonthlyReportSummary
 import com.example.data.model.TypingLanguage
 import com.example.data.model.TypingMode
 import com.example.data.model.TypingResult
+import com.example.data.repository.PaymentMethod
+import com.example.data.repository.SubscriptionManager
+import com.example.data.repository.SubscriptionState
 import com.example.data.repository.TypingRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -29,7 +32,31 @@ import java.util.Calendar
 class TypingViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: TypingRepository
+    private val subscriptionManager = SubscriptionManager.getInstance(application)
     private val vibrator = application.getSystemService(Vibrator::class.java)
+
+    val subscriptionState: StateFlow<SubscriptionState> = subscriptionManager.subscriptionState
+    val showSubscriptionDialog = MutableStateFlow(false)
+
+    fun openSubscriptionDialog() {
+        showSubscriptionDialog.value = true
+    }
+
+    fun closeSubscriptionDialog() {
+        showSubscriptionDialog.value = false
+    }
+
+    fun canAccessPractice(): Boolean {
+        return subscriptionManager.canAccessApp()
+    }
+
+    fun activateSubscription(
+        trxId: String,
+        senderPhone: String,
+        method: PaymentMethod
+    ): Pair<Boolean, String> {
+        return subscriptionManager.activateSubscriptionWithTrxId(trxId, senderPhone, method)
+    }
 
     init {
         val db = TypingDatabase.getDatabase(application)

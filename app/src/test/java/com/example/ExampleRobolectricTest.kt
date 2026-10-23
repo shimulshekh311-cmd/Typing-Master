@@ -43,4 +43,44 @@ class ExampleRobolectricTest {
     val textWithNewline = com.example.data.bijoy.BijoyLayoutEngine.processKeystroke("ক", '\n')
     assertEquals("ক\n", textWithNewline)
   }
+
+  @Test
+  fun `verify subscription manager starts with 7-day trial active and can access app`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val manager = com.example.data.repository.SubscriptionManager.getInstance(context)
+    manager.resetForTesting()
+    val state = manager.subscriptionState.value
+
+    assertTrue("Trial should be active on fresh install", state.isTrialActive)
+    assertTrue("Remaining trial days should be between 1 and 7", state.trialDaysLeft in 1..7)
+    assertTrue("User can access app during trial", manager.canAccessApp())
+  }
+
+  @Test
+  fun `verify subscription manager activation with trxId works correctly`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val manager = com.example.data.repository.SubscriptionManager.getInstance(context)
+    manager.resetForTesting()
+
+    // Invalid phone
+    val failPhone = manager.activateSubscriptionWithTrxId("TRX123456", "01712", com.example.data.repository.PaymentMethod.BKASH)
+    assertEquals(false, failPhone.first)
+
+    // Invalid trxId
+    val failTrx = manager.activateSubscriptionWithTrxId("123", "01712345678", com.example.data.repository.PaymentMethod.BKASH)
+    assertEquals(false, failTrx.first)
+
+    // Valid activation
+    val success = manager.activateSubscriptionWithTrxId("BL99ABC123", "01984251178", com.example.data.repository.PaymentMethod.BKASH)
+    assertEquals(true, success.first)
+
+    val updatedState = manager.subscriptionState.value
+    assertTrue("Should now be subscribed", updatedState.isSubscribed)
+    assertEquals("BL99ABC123", updatedState.activeTrxId)
+
+    // Prevent duplicate reuse of same TrxId
+    val duplicate = manager.activateSubscriptionWithTrxId("BL99ABC123", "01984251178", com.example.data.repository.PaymentMethod.BKASH)
+    assertEquals(false, duplicate.first)
+  }
 }
+
