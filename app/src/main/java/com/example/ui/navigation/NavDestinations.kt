@@ -17,7 +17,6 @@ enum class MainDestination(
     LEARN("learn", "Lessons", "পাঠ ও শিক্ষা", Icons.Default.School),
     SPEED_TEST("speed_test", "Speed Test", "গতি পরীক্ষা", Icons.Default.Speed),
     SCOREBOARD("scoreboard", "Scoreboard", "স্কোরবোর্ড", Icons.Default.Leaderboard),
-    MONTHLY_REPORT("monthly_report", "Monthly Report", "মাসিক রিপোর্ট", Icons.Default.BarChart),
-    ACCOUNT("account", "Account", "অ্যাকাউন্ট", Icons.Default.AccountCircle)
+    MONTHLY_REPORT("monthly_report", "Monthly Report", "মাসিক রিপোর্ট", Icons.Default.BarChart)
 }
 

@@ -116,10 +116,13 @@ class ExampleRobolectricTest {
   }
 
   @Test
-  fun `verify navigation includes account destination`() {
+  fun `verify navigation contains primary destinations`() {
     val destinations = com.example.ui.navigation.MainDestination.entries
-    assertTrue(destinations.contains(com.example.ui.navigation.MainDestination.ACCOUNT))
-    assertEquals("account", com.example.ui.navigation.MainDestination.ACCOUNT.route)
+    assertEquals(4, destinations.size)
+    assertTrue(destinations.contains(com.example.ui.navigation.MainDestination.LEARN))
+    assertTrue(destinations.contains(com.example.ui.navigation.MainDestination.SPEED_TEST))
+    assertTrue(destinations.contains(com.example.ui.navigation.MainDestination.SCOREBOARD))
+    assertTrue(destinations.contains(com.example.ui.navigation.MainDestination.MONTHLY_REPORT))
   }
 
   @Test

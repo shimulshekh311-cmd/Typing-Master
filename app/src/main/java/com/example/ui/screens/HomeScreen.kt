@@ -19,29 +19,35 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Diamond
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -83,13 +89,116 @@ fun HomeScreen(
 ) {
     var selectedLanguage by remember { mutableStateOf(TypingLanguage.BANGLA) }
     var showCustomInput by remember { mutableStateOf(false) }
+    var showCommunityDialog by remember { mutableStateOf(false) }
     var customTitle by remember { mutableStateOf("") }
     var customText by remember { mutableStateOf("") }
+    val context = LocalContext.current
 
     val lessons = if (selectedLanguage == TypingLanguage.BANGLA) {
         LessonDataSource.banglaLessons
     } else {
         LessonDataSource.englishLessons
+    }
+
+    if (showCommunityDialog) {
+        AlertDialog(
+            onDismissRequest = { showCommunityDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Groups,
+                        contentDescription = null,
+                        tint = CyanAccent,
+                        modifier = Modifier.size(26.dp)
+                    )
+                    Text(
+                        text = "কমিউনিটি ও সাপোর্ট",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "টাইপিং মাস্টার সম্পূর্ণ ফ্রি এবং বিজ্ঞাপন সমর্থিত। আমাদের সোশ্যাল কমিউনিটিতে যুক্ত হয়ে আপডেট পান ও প্রতিযোগিতা করুন:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/groups/712399671177659"))
+                                )
+                            },
+                        shape = RoundedCornerShape(10.dp),
+                        color = IndigoPrimary.copy(alpha = 0.15f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("👥 ১৯,০০০ সদস্যের ফেসবুক গ্রুপ", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Icon(Icons.Default.OpenInNew, contentDescription = null, tint = CyanAccent, modifier = Modifier.size(16.dp))
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/profile.php?id=61569426362539"))
+                                )
+                            },
+                        shape = RoundedCornerShape(10.dp),
+                        color = VioletSecondary.copy(alpha = 0.15f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("🌐 অফিসিয়াল ফেসবুক পেজ", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Icon(Icons.Default.OpenInNew, contentDescription = null, tint = VioletSecondary, modifier = Modifier.size(16.dp))
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/8801635586380"))
+                                )
+                            },
+                        shape = RoundedCornerShape(10.dp),
+                        color = EmeraldSuccess.copy(alpha = 0.15f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("💬 WhatsApp বিজনেস (01635586380)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Icon(Icons.Default.OpenInNew, contentDescription = null, tint = EmeraldSuccess, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showCommunityDialog = false }) {
+                    Text("বন্ধ করুন", color = CyanAccent, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
     }
 
     LazyColumn(
@@ -118,6 +227,18 @@ fun HomeScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = EmeraldSuccess,
                         fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                IconButton(
+                    onClick = { showCommunityDialog = true },
+                    modifier = Modifier.testTag("community_hub_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Groups,
+                        contentDescription = "Community Hub",
+                        tint = CyanAccent,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }

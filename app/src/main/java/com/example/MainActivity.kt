@@ -32,7 +32,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.ui.navigation.MainDestination
-import com.example.ui.screens.AccountScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.MonthlyReportScreen
 import com.example.ui.screens.ScoreboardScreen
@@ -160,9 +159,6 @@ fun MainAppContent(viewModel: TypingViewModel) {
                     }
                     MainDestination.MONTHLY_REPORT -> {
                         MonthlyReportScreen(viewModel = viewModel)
-                    }
-                    MainDestination.ACCOUNT -> {
-                        AccountScreen(viewModel = viewModel)
                     }
                 }
             }
