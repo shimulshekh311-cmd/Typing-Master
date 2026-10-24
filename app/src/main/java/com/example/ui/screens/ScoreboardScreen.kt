@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ui.components.AdBannerView
 import com.example.ui.components.ScoreboardSummaryHero
 import com.example.ui.components.TypingResultItemCard
 import com.example.ui.theme.CyanAccent
@@ -116,6 +117,11 @@ fun ScoreboardScreen(
                     }
                 }
             }
+        }
+
+        // Google AdMob / Sponsor Banner
+        item {
+            AdBannerView(viewModel = viewModel)
         }
 
         // Hero Summary Banner

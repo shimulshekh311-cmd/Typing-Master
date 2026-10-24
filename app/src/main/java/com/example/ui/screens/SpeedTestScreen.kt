@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.datasource.LessonDataSource
 import com.example.data.model.InputLayoutMode
 import com.example.data.model.TypingLanguage
+import com.example.ui.components.AdBannerView
 import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.EmeraldSuccess
@@ -113,6 +114,11 @@ fun SpeedTestScreen(
                     )
                 }
             }
+        }
+
+        // Google AdMob / Sponsor Banner
+        item {
+            AdBannerView(viewModel = viewModel)
         }
 
         // Language Select

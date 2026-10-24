@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.TypingLanguage
+import com.example.ui.components.InterstitialAdDialog
 import com.example.ui.components.LiveTypingDisplay
 import com.example.ui.components.VirtualKeyboardHelper
 import com.example.ui.theme.AmberWarning
@@ -88,6 +89,7 @@ fun TypingSessionScreen(
     val liveAccuracy by viewModel.liveAccuracy.collectAsStateWithLifecycle()
     val mistakeCount by viewModel.mistakeCount.collectAsStateWithLifecycle()
     val completedResult by viewModel.lastCompletedResult.collectAsStateWithLifecycle()
+    val showInterstitialAd by viewModel.showInterstitialAd.collectAsStateWithLifecycle()
     val selectedLanguage by viewModel.selectedLanguage.collectAsStateWithLifecycle()
     val inputLayoutMode by viewModel.inputLayoutMode.collectAsStateWithLifecycle()
     val isPaperMode by viewModel.isPaperMode.collectAsStateWithLifecycle()
@@ -434,6 +436,14 @@ fun TypingSessionScreen(
                 ) {
                     Text("আবার চেষ্টা করুন")
                 }
+            }
+        )
+    }
+
+    if (showInterstitialAd) {
+        InterstitialAdDialog(
+            onDismiss = {
+                viewModel.dismissInterstitialAd()
             }
         )
     }

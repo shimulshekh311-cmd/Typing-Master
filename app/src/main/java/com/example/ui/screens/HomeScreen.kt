@@ -66,8 +66,7 @@ import com.example.data.model.Difficulty
 import com.example.data.model.InputLayoutMode
 import com.example.data.model.Lesson
 import com.example.data.model.TypingLanguage
-import com.example.data.repository.SubscriptionManager
-import com.example.ui.components.SubscriptionDialog
+import com.example.ui.components.AdBannerView
 import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.EmeraldSuccess
@@ -86,21 +85,6 @@ fun HomeScreen(
     var showCustomInput by remember { mutableStateOf(false) }
     var customTitle by remember { mutableStateOf("") }
     var customText by remember { mutableStateOf("") }
-
-    val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
-    val subscriptionState by viewModel.subscriptionState.collectAsStateWithLifecycle()
-    val showSubscriptionDialog by viewModel.showSubscriptionDialog.collectAsStateWithLifecycle()
-
-    if (showSubscriptionDialog) {
-        SubscriptionDialog(
-            subscriptionState = subscriptionState,
-            onDismiss = { viewModel.closeSubscriptionDialog() },
-            onActivate = { trxId, phone, method ->
-                viewModel.activateSubscription(trxId, phone, method)
-            }
-        )
-    }
 
     val lessons = if (selectedLanguage == TypingLanguage.BANGLA) {
         LessonDataSource.banglaLessons
@@ -130,216 +114,23 @@ fun HomeScreen(
                         color = CyanAccent
                     )
                     Text(
-                        text = "বাংলা ও ইংরেজি টাইপিং দক্ষতা বৃদ্ধির প্ল্যাটফর্ম",
+                        text = "১০০% ফ্রি বাংলা ও ইংরেজি টাইপিং প্ল্যাটফর্ম • বিজ্ঞাপন সমর্থিত",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = EmeraldSuccess,
+                        fontWeight = FontWeight.SemiBold
                     )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Premium Badge Button in Header
-                Surface(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { viewModel.openSubscriptionDialog() }
-                        .testTag("header_premium_badge"),
-                    color = if (subscriptionState.isSubscribed) EmeraldSuccess.copy(alpha = 0.2f) else IndigoPrimary.copy(alpha = 0.2f),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        if (subscriptionState.isSubscribed) EmeraldSuccess else CyanAccent
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (subscriptionState.isSubscribed) Icons.Default.Verified else Icons.Default.Diamond,
-                            contentDescription = "Subscription",
-                            tint = if (subscriptionState.isSubscribed) EmeraldSuccess else CyanAccent,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = if (subscriptionState.isSubscribed) "প্রিমিয়াম" else "মাসিক ৪৫৳",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (subscriptionState.isSubscribed) EmeraldSuccess else CyanAccent
-                        )
-                    }
                 }
             }
         }
 
-        // UPFRONT SUBSCRIPTION & PAYMENT DETAILS CARD
+        // Google AdMob / Sponsor Banner Component
         item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("upfront_subscription_banner_card"),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (subscriptionState.isSubscribed) {
-                        EmeraldSuccess.copy(alpha = 0.12f)
-                    } else if (subscriptionState.isTrialActive) {
-                        IndigoPrimary.copy(alpha = 0.15f)
-                    } else {
-                        AmberWarning.copy(alpha = 0.15f)
-                    }
-                ),
-                border = if (subscriptionState.isSubscribed) {
-                    androidx.compose.foundation.BorderStroke(1.5.dp, EmeraldSuccess.copy(alpha = 0.6f))
-                } else {
-                    androidx.compose.foundation.BorderStroke(1.5.dp, Brush.linearGradient(listOf(CyanAccent, VioletSecondary)))
-                }
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(CircleShape)
-                                    .background(if (subscriptionState.isSubscribed) EmeraldSuccess else IndigoPrimary),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = if (subscriptionState.isSubscribed) Icons.Default.Verified else Icons.Default.Diamond,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Column {
-                                Text(
-                                    text = "টাইপিং মাস্টার মেম্বারশিপ",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "মাসিক ফি: মাত্র ৪৫ টাকা (প্রথম ৭ দিন ফ্রি ট্রায়াল)",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = EmeraldSuccess
-                                )
-                            }
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (subscriptionState.isSubscribed) EmeraldSuccess else AmberWarning
-                        ) {
-                            Text(
-                                text = if (subscriptionState.isSubscribed) "সক্রিয়" else if (subscriptionState.isTrialActive) "ফ্রি ট্রায়াল" else "মেয়াদ শেষ",
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = subscriptionState.statusMessageBn,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Payment Method & Account info pill
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = "পেমেন্ট মাধ্যম (Send Money): বিকাশ ও নগদ",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "${SubscriptionManager.BKASH_NAGAD_NUMBER}  (মাসিক ৪৫৳)",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = CyanAccent
-                                )
-                            }
-
-                            Button(
-                                onClick = {
-                                    clipboardManager.setText(AnnotatedString(SubscriptionManager.BKASH_NAGAD_NUMBER))
-                                    Toast.makeText(context, "নম্বর ${SubscriptionManager.BKASH_NAGAD_NUMBER} কপি হয়েছে!", Toast.LENGTH_SHORT).show()
-                                },
-                                contentPadding = ButtonDefaults.TextButtonContentPadding,
-                                shape = RoundedCornerShape(6.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = "Copy",
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("কপি", fontSize = 11.sp)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = { viewModel.openSubscriptionDialog() },
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("open_subscription_pay_button"),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (subscriptionState.isSubscribed) EmeraldSuccess else VioletSecondary
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Payments,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = Color.White
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (subscriptionState.isSubscribed) "সাবস্ক্রিপশন তথ্য" else "অটোমেটিক পে ও TrxID সক্রিয়করণ",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-                }
-            }
+            AdBannerView(
+                viewModel = viewModel,
+                onNavigateToSpeedTest = onNavigateToSpeedTest
+            )
         }
+
 
         // Language Switcher Selector
         item {
@@ -477,13 +268,7 @@ fun HomeScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        if (!viewModel.canAccessPractice()) {
-                            viewModel.openSubscriptionDialog()
-                        } else {
-                            onNavigateToSpeedTest()
-                        }
-                    }
+                    .clickable { onNavigateToSpeedTest() }
                     .testTag("quick_speed_test_banner"),
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(
@@ -596,9 +381,7 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(10.dp))
                         Button(
                             onClick = {
-                                if (!viewModel.canAccessPractice()) {
-                                    viewModel.openSubscriptionDialog()
-                                } else if (customText.isNotBlank()) {
+                                if (customText.isNotBlank()) {
                                     viewModel.startCustomPractice(customTitle, customText, null)
                                 }
                             },
@@ -643,13 +426,7 @@ fun HomeScreen(
         items(lessons, key = { it.id }) { lesson ->
             LessonCardItem(
                 lesson = lesson,
-                onStart = {
-                    if (!viewModel.canAccessPractice()) {
-                        viewModel.openSubscriptionDialog()
-                    } else {
-                        onStartLesson(lesson)
-                    }
-                }
+                onStart = { onStartLesson(lesson) }
             )
         }
 

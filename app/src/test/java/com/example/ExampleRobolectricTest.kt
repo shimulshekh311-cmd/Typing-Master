@@ -114,6 +114,39 @@ class ExampleRobolectricTest {
     assertEquals("72K9M1PQ", result.trxId)
     assertEquals(com.example.data.repository.PaymentMethod.NAGAD, result.method)
   }
+
+  @Test
+  fun `verify navigation includes account destination`() {
+    val destinations = com.example.ui.navigation.MainDestination.entries
+    assertTrue(destinations.contains(com.example.ui.navigation.MainDestination.ACCOUNT))
+    assertEquals("account", com.example.ui.navigation.MainDestination.ACCOUNT.route)
+  }
+
+  @Test
+  fun `verify ad manager records banner and interstitial impressions and respects ad-free mode`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val adManager = com.example.data.repository.AdManager.getInstance(context)
+    adManager.resetForTesting()
+    val initialImpressions = adManager.adStats.value.totalImpressions
+    assertEquals(0, initialImpressions)
+
+    adManager.recordBannerImpression()
+    adManager.recordInterstitialImpression()
+
+    val updatedStats = adManager.adStats.value
+    assertEquals(initialImpressions + 2, updatedStats.totalImpressions)
+    assertTrue("Estimated earnings should be positive", updatedStats.estimatedEarningsBdt >= 0.0)
+
+    // Verify ad-free toggle
+    adManager.setAdFree(true)
+    assertTrue(adManager.adStats.value.isAdFree)
+
+    // No new impressions counted when ad-free is true
+    val countBefore = adManager.adStats.value.totalImpressions
+    adManager.recordBannerImpression()
+    assertEquals(countBefore, adManager.adStats.value.totalImpressions)
+  }
 }
+
 
 

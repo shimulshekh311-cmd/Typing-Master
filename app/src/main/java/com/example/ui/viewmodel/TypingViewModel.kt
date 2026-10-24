@@ -13,6 +13,9 @@ import com.example.data.model.MonthlyReportSummary
 import com.example.data.model.TypingLanguage
 import com.example.data.model.TypingMode
 import com.example.data.model.TypingResult
+import com.example.data.repository.AdCreative
+import com.example.data.repository.AdManager
+import com.example.data.repository.AdStats
 import com.example.data.repository.PaymentMethod
 import com.example.data.repository.SubscriptionManager
 import com.example.data.repository.SubscriptionState
@@ -33,10 +36,14 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
 
     private val repository: TypingRepository
     private val subscriptionManager = SubscriptionManager.getInstance(application)
+    private val adManager = AdManager.getInstance(application)
     private val vibrator = application.getSystemService(Vibrator::class.java)
 
     val subscriptionState: StateFlow<SubscriptionState> = subscriptionManager.subscriptionState
+    val adStats: StateFlow<AdStats> = adManager.adStats
+    val currentBannerCreative: StateFlow<AdCreative> = adManager.currentBannerCreative
     val showSubscriptionDialog = MutableStateFlow(false)
+    val showInterstitialAd = MutableStateFlow(false)
 
     fun openSubscriptionDialog() {
         showSubscriptionDialog.value = true
@@ -47,7 +54,21 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun canAccessPractice(): Boolean {
-        return subscriptionManager.canAccessApp()
+        // App is 100% free and unlocked for all users with ads!
+        return true
+    }
+
+    fun recordBannerImpression() = adManager.recordBannerImpression()
+
+    fun recordInterstitialImpression() = adManager.recordInterstitialImpression()
+
+    fun setAdFree(enabled: Boolean) = adManager.setAdFree(enabled)
+
+    fun updateCustomAdMobIds(bannerId: String?, interstitialId: String?) =
+        adManager.updateCustomAdMobIds(bannerId, interstitialId)
+
+    fun dismissInterstitialAd() {
+        showInterstitialAd.value = false
     }
 
     fun activateSubscription(
@@ -55,7 +76,11 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         senderPhone: String,
         method: PaymentMethod
     ): Pair<Boolean, String> {
-        return subscriptionManager.activateSubscriptionWithTrxId(trxId, senderPhone, method)
+        val result = subscriptionManager.activateSubscriptionWithTrxId(trxId, senderPhone, method)
+        if (result.first) {
+            adManager.setAdFree(true)
+        }
+        return result
     }
 
     fun parseSmsOrClipboard(text: String) = subscriptionManager.parseSmsOrText(text)
@@ -473,6 +498,12 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         )
 
         _lastCompletedResult.value = result
+
+        // Trigger Interstitial Ad if not Ad-Free
+        if (!adManager.adStats.value.isAdFree) {
+            showInterstitialAd.value = true
+            adManager.recordInterstitialImpression()
+        }
 
         // Save into Room Database
         viewModelScope.launch {
