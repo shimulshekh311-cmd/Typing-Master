@@ -64,6 +64,10 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setAdFree(enabled: Boolean) = adManager.setAdFree(enabled)
 
+    fun setUseGoogleTestUnits(enabled: Boolean) = adManager.setUseGoogleTestUnits(enabled)
+
+    fun setLastAdStatus(status: String) = adManager.setLastAdStatus(status)
+
     fun updateCustomAdMobIds(bannerId: String?, interstitialId: String?) =
         adManager.updateCustomAdMobIds(bannerId, interstitialId)
 

@@ -40,6 +40,7 @@ import com.example.ui.screens.TypingSessionScreen
 import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.TypingViewModel
+import com.google.android.gms.ads.MobileAds
 
 class MainActivity : ComponentActivity() {
 
@@ -48,6 +49,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Initialize Google Mobile Ads SDK
+        MobileAds.initialize(this)
+
         setContent {
             MyApplicationTheme {
                 MainAppContent(viewModel = viewModel)

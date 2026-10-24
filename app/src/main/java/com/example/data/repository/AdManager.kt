@@ -20,10 +20,16 @@ data class AdStats(
     val totalInterstitialImpressions: Int = 0,
     val estimatedEarningsBdt: Double = 0.0,
     val isAdFree: Boolean = false,
+    val useGoogleTestUnits: Boolean = false,
     val adMobBannerId: String = AdManager.DEFAULT_BANNER_ID,
-    val adMobInterstitialId: String = AdManager.DEFAULT_INTERSTITIAL_ID
+    val adMobInterstitialId: String = AdManager.DEFAULT_INTERSTITIAL_ID,
+    val lastAdStatus: String = "অ্যাডমব প্রস্তুত (AdMob Initialized)"
 ) {
     val totalImpressions: Int get() = totalBannerImpressions + totalInterstitialImpressions
+    val activeBannerId: String
+        get() = if (useGoogleTestUnits) AdManager.GOOGLE_TEST_BANNER_ID else adMobBannerId
+    val activeInterstitialId: String
+        get() = if (useGoogleTestUnits) AdManager.GOOGLE_TEST_INTERSTITIAL_ID else adMobInterstitialId
 }
 
 class AdManager private constructor(context: Context) {
@@ -70,6 +76,16 @@ class AdManager private constructor(context: Context) {
         updateStatsState()
     }
 
+    fun setUseGoogleTestUnits(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_USE_TEST_UNITS, enabled).apply()
+        updateStatsState()
+    }
+
+    fun setLastAdStatus(status: String) {
+        prefs.edit().putString(KEY_LAST_AD_STATUS, status).apply()
+        updateStatsState()
+    }
+
     fun resetForTesting() {
         prefs.edit().clear().apply()
         updateStatsState()
@@ -91,6 +107,7 @@ class AdManager private constructor(context: Context) {
         val banners = prefs.getInt(KEY_BANNER_IMPRESSIONS, 0)
         val interstitials = prefs.getInt(KEY_INTERSTITIAL_IMPRESSIONS, 0)
         val isAdFree = prefs.getBoolean(KEY_IS_AD_FREE, false)
+        val useTestUnits = prefs.getBoolean(KEY_USE_TEST_UNITS, false)
         val savedBanner = prefs.getString(KEY_CUSTOM_BANNER_ID, null)
         val bannerId = if (savedBanner.isNullOrBlank() || savedBanner.contains("3940256099942544")) {
             DEFAULT_BANNER_ID
@@ -103,6 +120,7 @@ class AdManager private constructor(context: Context) {
         } else {
             savedInterstitial
         }
+        val lastStatus = prefs.getString(KEY_LAST_AD_STATUS, "অ্যাডমব সক্রিয়") ?: "অ্যাডমব সক্রিয়"
 
         // Estimated eCPM calculation (avg ~৳120 - ৳180 per 1,000 mixed impressions)
         val total = banners + interstitials
@@ -113,8 +131,10 @@ class AdManager private constructor(context: Context) {
             totalInterstitialImpressions = interstitials,
             estimatedEarningsBdt = estimatedEarnings,
             isAdFree = isAdFree,
+            useGoogleTestUnits = useTestUnits,
             adMobBannerId = bannerId,
-            adMobInterstitialId = interstitialId
+            adMobInterstitialId = interstitialId,
+            lastAdStatus = lastStatus
         )
     }
 
@@ -127,13 +147,18 @@ class AdManager private constructor(context: Context) {
         private const val KEY_BANNER_IMPRESSIONS = "key_banner_impressions"
         private const val KEY_INTERSTITIAL_IMPRESSIONS = "key_interstitial_impressions"
         private const val KEY_IS_AD_FREE = "key_is_ad_free"
+        private const val KEY_USE_TEST_UNITS = "key_use_test_units"
         private const val KEY_CUSTOM_BANNER_ID = "key_custom_banner_id"
         private const val KEY_CUSTOM_INTERSTITIAL_ID = "key_custom_interstitial_id"
+        private const val KEY_LAST_AD_STATUS = "key_last_ad_status"
 
         // Official Google AdMob Live Production IDs for Typing Master App
         const val ADMOB_APP_ID = "ca-app-pub-2983938252837230~4640265693"
         const val DEFAULT_BANNER_ID = "ca-app-pub-2983938252837230/6080632034"
         const val DEFAULT_INTERSTITIAL_ID = "ca-app-pub-2983938252837230/8387939014"
+
+        const val GOOGLE_TEST_BANNER_ID = "ca-app-pub-3940256099942544/6300978111"
+        const val GOOGLE_TEST_INTERSTITIAL_ID = "ca-app-pub-3940256099942544/1033173712"
 
         val sampleCreatives = listOf(
             AdCreative(
