@@ -60,9 +60,10 @@ object BijoyLayoutEngine {
         'b' to "ন",
         'n' to "স",
         'm' to "ম",
-        '.' to "।", // Standard Bengali full stop (দাঁড়ি)
+        '.' to ".", // Full stop (ফুল স্টপ)
         ',' to ",",
-        '/' to "ৎ", // Khanda-ta
+        '\\' to "ৎ", // Khanda-ta on \ key
+        '/' to "ৎ", // Khanda-ta alternative
         '1' to "১",
         '2' to "২",
         '3' to "৩",
@@ -102,7 +103,7 @@ object BijoyLayoutEngine {
         ':' to "ঃ", // Bisarga
         '"' to "\"",
         'Z' to "্য", // Ya-phala shortcut (্ + য)
-        'X' to "ৌ", // OU-kar
+        'X' to "ৗ", // Au length mark (ঔ-কারের পরের অংশ: ে + অক্ষর + ৗ = দৌ)
         'C' to "ৈ", // OI-kar
         'V' to "ল",
         'B' to "ণ",
@@ -124,7 +125,7 @@ object BijoyLayoutEngine {
         '_' to "_",
         '+' to "+",
         '~' to "~",
-        '|' to "।"  // Dari alternative
+        '|' to "ঃ"  // Bisarga on Shift + \
     )
 
     // Full vowels and special characters initiated with Link Key 'g' in Bijoy:
@@ -185,7 +186,7 @@ object BijoyLayoutEngine {
         'K' to BijoyKeyInfo("ত", "থ"),
         'L' to BijoyKeyInfo("দ", "ধ"),
         'Z' to BijoyKeyInfo("্র", "্য"),
-        'X' to BijoyKeyInfo("ও", "ৌ"), // Normal: ও, Shift: ৌ
+        'X' to BijoyKeyInfo("ও", "ৗ"), // Normal: ও, Shift: ৗ (ঔ-কারের অংশ)
         'C' to BijoyKeyInfo("ে", "ৈ"),
         'V' to BijoyKeyInfo("র", "ল"),
         'B' to BijoyKeyInfo("ন", "ণ"),
@@ -232,9 +233,9 @@ object BijoyLayoutEngine {
             'ড়' -> "P"
             'ঢ়' -> "Shift + P"
             'য়' -> "Shift + W"
-            'ৎ' -> "/"
+            'ৎ' -> "\\ (বা /)"
             'ং' -> "Shift + Q"
-            'ঃ' -> "Shift + ;"
+            'ঃ' -> "Shift + \\ (বা Shift + ;)"
             'ঁ' -> "Shift + 7 বা Shift + 6"
             '্' -> "G (হসন্ত)"
             'া' -> "F"
@@ -245,8 +246,9 @@ object BijoyLayoutEngine {
             'ৃ' -> "A"
             'ে' -> "C"
             'ৈ' -> "Shift + C"
-            'ো' -> "C + ব্যঞ্জনবর্ণ + F (বা X)"
-            'ৌ' -> "C + ব্যঞ্জনবর্ণ + Shift+X (বা Shift + X)"
+            'ো' -> "C + ব্যঞ্জনবর্ণ + F"
+            'ৌ' -> "C + ব্যঞ্জনবর্ণ + Shift+X"
+            'ৗ' -> "Shift + X"
             'অ' -> "Shift + F"
             'আ' -> "G + F"
             'ই' -> "G + D"
@@ -258,9 +260,10 @@ object BijoyLayoutEngine {
             'ঐ' -> "G + Shift + C"
             'ও' -> "X (বা G + X)"
             'ঔ' -> "G + Shift + X"
-            '।' -> "Shift + G বা ."
+            '।' -> "Shift + G"
             '॥' -> "G + Shift + G"
             '৳' -> "Shift + 4"
+            '.' -> "."
             ',' -> ","
             ' ' -> "Space"
             else -> char.toString()
@@ -377,13 +380,10 @@ object BijoyLayoutEngine {
             return currentText + "া"
         }
 
-        // 9. Circumfix OU-kar: 'ে' + 'ৌ' -> 'ৌ'
-        if (mapped == "ৌ" && (lastChar == 'ে' || clusterKar == "ে")) {
+        // 9. AU length mark 'ৗ' (Shift + X): e.g. ে + দ + ৗ = দৌ
+        if (mapped == "ৗ") {
             resetState()
-            if (lastChar == 'ে') {
-                return currentText.dropLast(1) + "ৌ"
-            }
-            return currentText + "ৌ"
+            return currentText + "ৗ"
         }
 
         // 10. Normalize Ya-phala: hasant + য় -> ্য
@@ -401,7 +401,7 @@ object BijoyLayoutEngine {
     }
 
     fun isBengaliVowelSign(c: Char): Boolean {
-        return c in "ািীুূৃেৈোৌ"
+        return c in "ািীুূৃেৈোৌৗ"
     }
 
     /**

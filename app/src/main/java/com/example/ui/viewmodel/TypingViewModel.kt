@@ -412,13 +412,16 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         val elapsedSec = _elapsedSeconds.value.coerceAtLeast(1)
         val minutes = elapsedSec / 60.0f
 
+        val normTarget = java.text.Normalizer.normalize(target, java.text.Normalizer.Form.NFC)
+        val normInput = java.text.Normalizer.normalize(input, java.text.Normalizer.Form.NFC)
+
         if (isPaperMode.value) {
             // Paper Copy Mode: transcribe from physical paper
             var mistakes = 0
-            if (target.isNotEmpty()) {
-                val minLen = minOf(target.length, input.length)
+            if (normTarget.isNotEmpty()) {
+                val minLen = minOf(normTarget.length, normInput.length)
                 for (i in 0 until minLen) {
-                    if (target[i] != input[i]) {
+                    if (normTarget[i] != normInput[i]) {
                         mistakes++
                     }
                 }
@@ -427,7 +430,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
 
             val correctChars = (totalTyped - mistakes).coerceAtLeast(0)
             val accuracy = if (totalTyped > 0) {
-                if (target.isNotEmpty()) {
+                if (normTarget.isNotEmpty()) {
                     ((correctChars.toFloat() / totalTyped.toFloat()) * 100f).coerceIn(0f, 100f)
                 } else {
                     100f
@@ -445,9 +448,9 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
             _liveWpm.value = wpm
         } else {
             var mistakes = 0
-            val minLen = minOf(target.length, input.length)
+            val minLen = minOf(normTarget.length, normInput.length)
             for (i in 0 until minLen) {
-                if (target[i] != input[i]) {
+                if (normTarget[i] != normInput[i]) {
                     mistakes++
                 }
             }

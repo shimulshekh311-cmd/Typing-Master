@@ -115,21 +115,45 @@ class ExampleUnitTest {
   }
 
   @Test
-  fun testPunctuationAndSymbols() {
-    // Dari with Shift + G or dot
+  fun testBackslashAndBisarga() {
+    // Normal \ key -> ৎ
+    assertEquals("ৎ", typeString("\\"))
+    // Shift + \ key (|) -> ঃ
+    assertEquals("ঃ", typeString("|"))
+    // Alternative keys also work
+    assertEquals("ৎ", typeString("/"))
+    assertEquals("ঃ", typeString(":"))
+  }
+
+  @Test
+  fun testDotAndDari() {
+    // Dot (.) key -> . (Full stop)
+    assertEquals(".", typeString("."))
+    // Shift + G -> । (Dari)
     assertEquals("।", typeString("G"))
-    assertEquals("।", typeString("."))
-    // Double Dari
+    // g + Shift + G -> ॥ (Double Dari)
     assertEquals("॥", typeString("gG"))
-    assertEquals("॥", typeString("g."))
+  }
+
+  @Test
+  fun testAuKarSequence() {
+    // c (ে) + l (দ) + X (ৗ) -> দৌ
+    assertEquals("দৌ", typeString("clX"))
+    // c (ে) + j (ক) + X (ৗ) -> কৌ
+    assertEquals("কৌ", typeString("cjX"))
+    // Standalone Shift + X -> ৗ
+    assertEquals("ৗ", typeString("X"))
+    // Full vowel Au (g + X) -> ঔ
+    assertEquals("ঔ", typeString("gX"))
+  }
+
+  @Test
+  fun testPunctuationAndSymbols() {
     // Bengali Taka symbol
     assertEquals("৳", typeString("$"))
-    // Khanda-Ta
-    assertEquals("ৎ", typeString("/"))
-    // Bisarga
-    assertEquals("ঃ", typeString(":"))
     // Chandrabindu
     assertEquals("ঁ", typeString("&"))
+    assertEquals("ঁ", typeString("^"))
     // Bengali Digits
     assertEquals("১২৩৪৫৬৭৮৯০", typeString("1234567890"))
   }
