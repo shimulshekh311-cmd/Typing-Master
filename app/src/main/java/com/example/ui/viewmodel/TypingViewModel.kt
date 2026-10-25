@@ -271,6 +271,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         _sessionTitle.value = title
         _targetText.value = text.replace("\r\n", " ").replace("\n", " ").trim()
         _userInput.value = ""
+        com.example.data.bijoy.BijoyLayoutEngine.resetState()
         _elapsedSeconds.value = 0
         _timeLimitSeconds.value = timeLimitSecs
         _isSessionActive.value = true
@@ -345,6 +346,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         if (!_isSessionActive.value || _isSessionFinished.value) return
         if (_userInput.value.isNotEmpty()) {
             _userInput.value = _userInput.value.dropLast(1)
+            com.example.data.bijoy.BijoyLayoutEngine.onBackspace()
             updateLiveMetrics()
             if (hapticEnabled.value) {
                 triggerKeyHaptic()
