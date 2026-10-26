@@ -103,7 +103,8 @@ fun LiveTypingDisplay(
     onPhysicalKey: (Char) -> Unit,
     onBackspace: () -> Unit,
     onToggleLayoutMode: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isTimerRunning: Boolean = false
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -206,17 +207,17 @@ fun LiveTypingDisplay(
             )
 
             val timerText = if (timeLimitSeconds != null) {
-                val remaining = (timeLimitSeconds - elapsedSeconds).coerceAtLeast(0)
+                val remaining = if (!isTimerRunning && elapsedSeconds == 0) timeLimitSeconds else (timeLimitSeconds - elapsedSeconds).coerceAtLeast(0)
                 String.format(Locale.US, "%02d:%02d", remaining / 60, remaining % 60)
             } else {
                 String.format(Locale.US, "%02d:%02d", elapsedSeconds / 60, elapsedSeconds % 60)
             }
 
             HudStatBadge(
-                label = if (timeLimitSeconds != null) "Time Left" else "Elapsed",
+                label = if (!isTimerRunning && elapsedSeconds == 0) "Timer Ready" else (if (timeLimitSeconds != null) "Time Left" else "Elapsed"),
                 value = timerText,
                 icon = Icons.Default.Timer,
-                tint = IndigoPrimary,
+                tint = if (!isTimerRunning && elapsedSeconds == 0) AmberWarning else IndigoPrimary,
                 modifier = Modifier.weight(1f)
             )
 
@@ -227,6 +228,37 @@ fun LiveTypingDisplay(
                 tint = if (isPaperMode) CyanAccent else (if (mistakeCount > 0) RoseError else MaterialTheme.colorScheme.onSurfaceVariant),
                 modifier = Modifier.weight(1f)
             )
+        }
+
+        // Timer Notification Banner before first keystroke
+        AnimatedVisibility(visible = !isTimerRunning && elapsedSeconds == 0) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                shape = RoundedCornerShape(10.dp),
+                color = AmberWarning.copy(alpha = 0.15f),
+                border = BorderStroke(1.dp, AmberWarning.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Timer,
+                        contentDescription = null,
+                        tint = AmberWarning,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "⌨️ কিবোর্ডের যেকোনো বাটনে চাপ দিলে সময় গণনা শুরু হবে",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = AmberWarning
+                    )
+                }
+            }
         }
 
         // 2. Mode Toggle Bar (Landscape 50/50 Split Mode vs Fullscreen Paper Copy Mode)

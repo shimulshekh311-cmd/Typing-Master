@@ -68,10 +68,6 @@ fun SpeedTestScreen(
 ) {
     var selectedDuration by remember { mutableIntStateOf(120) }
     var selectedLanguage by remember { mutableStateOf(TypingLanguage.BANGLA) }
-    var selectedDifficulty by remember { mutableStateOf("Medium") }
-    var selectedPassageTitle by remember(selectedLanguage) { mutableStateOf<String?>(null) }
-    var isPassageDropdownExpanded by remember { mutableStateOf(false) }
-
     val availableParagraphs = remember(selectedLanguage) {
         if (selectedLanguage == TypingLanguage.BANGLA) {
             LessonDataSource.speedTestParagraphsBangla
@@ -80,12 +76,13 @@ fun SpeedTestScreen(
         }
     }
 
+    var selectedPassageTitle by remember(selectedLanguage) {
+        mutableStateOf(availableParagraphs.random().first)
+    }
+    var isPassageDropdownExpanded by remember { mutableStateOf(false) }
+
     val activeParagraphPair = remember(selectedPassageTitle, availableParagraphs) {
-        if (selectedPassageTitle != null && selectedPassageTitle != "RANDOM") {
-            availableParagraphs.find { it.first == selectedPassageTitle } ?: availableParagraphs.first()
-        } else {
-            availableParagraphs.first()
-        }
+        availableParagraphs.find { it.first == selectedPassageTitle } ?: availableParagraphs.first()
     }
 
     LazyColumn(
@@ -347,13 +344,20 @@ fun SpeedTestScreen(
                                 tint = CyanAccent,
                                 modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = selectedPassageTitle ?: "🎲 এলোমেলো অনুচ্ছেদ (স্বয়ংক্রিয় নির্বাচন)",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            Column {
+                                Text(
+                                    text = activeParagraphPair.first,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CyanAccent
+                                )
+                                Text(
+                                    text = "🎲 স্বয়ংক্রিয়ভাবে নির্বাচিত • পরিবর্তন করতে ট্যাপ করুন",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                         Icon(
                             imageVector = if (isPassageDropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
@@ -364,38 +368,31 @@ fun SpeedTestScreen(
 
                     if (isPassageDropdownExpanded) {
                         Spacer(modifier = Modifier.height(12.dp))
-                        // Random option
+                        // Re-roll Random option
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
-                                    selectedPassageTitle = null
+                                    val otherParagraphs = availableParagraphs.filter { it.first != selectedPassageTitle }
+                                    selectedPassageTitle = (if (otherParagraphs.isNotEmpty()) otherParagraphs.random() else availableParagraphs.random()).first
                                     isPassageDropdownExpanded = false
                                 }
                                 .padding(vertical = 2.dp),
-                            color = if (selectedPassageTitle == null) CyanAccent.copy(alpha = 0.2f) else Color.Transparent,
+                            color = CyanAccent.copy(alpha = 0.15f),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "🎲 এলোমেলো অনুচ্ছেদ (স্বয়ংক্রিয় নির্বাচন)",
+                                    text = "🎲 নতুন করে আরেকটি এলোমেলো অনুচ্ছেদ নিন (Shuffle Random)",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (selectedPassageTitle == null) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (selectedPassageTitle == null) CyanAccent else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CyanAccent,
                                     modifier = Modifier.weight(1f)
                                 )
-                                if (selectedPassageTitle == null) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Selected",
-                                        tint = CyanAccent,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
                             }
                         }
 
@@ -487,7 +484,7 @@ fun SpeedTestScreen(
             Button(
                 onClick = {
                     viewModel.setSelectedLanguage(selectedLanguage)
-                    viewModel.startSpeedTest(selectedDuration, selectedDifficulty, selectedPassageTitle)
+                    viewModel.startSpeedTest(selectedDuration, "Medium", activeParagraphPair.first)
                     onStartTest()
                 },
                 modifier = Modifier

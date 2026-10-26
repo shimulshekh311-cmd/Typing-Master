@@ -122,6 +122,9 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     private val _isSessionActive = MutableStateFlow(false)
     val isSessionActive: StateFlow<Boolean> = _isSessionActive.asStateFlow()
 
+    private val _isTimerRunning = MutableStateFlow(false)
+    val isTimerRunning: StateFlow<Boolean> = _isTimerRunning.asStateFlow()
+
     private val _isSessionFinished = MutableStateFlow(false)
     val isSessionFinished: StateFlow<Boolean> = _isSessionFinished.asStateFlow()
 
@@ -272,6 +275,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
 
     fun startSession(title: String, text: String, timeLimitSecs: Int?) {
         timerJob?.cancel()
+        _isTimerRunning.value = false
         _sessionTitle.value = title
         _targetText.value = text.replace("\r\n", " ").replace("\n", " ").trim()
         _userInput.value = ""
@@ -284,12 +288,21 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         _liveAccuracy.value = 100f
         _mistakeCount.value = 0
         _lastCompletedResult.value = null
-        sessionStartTimeMs = System.currentTimeMillis()
+        sessionStartTimeMs = 0L
 
-        startTimer()
+        // Timer will start on candidate's first keypress
+    }
+
+    fun ensureTimerStarted() {
+        if (!_isTimerRunning.value && _isSessionActive.value && !_isSessionFinished.value) {
+            _isTimerRunning.value = true
+            sessionStartTimeMs = System.currentTimeMillis()
+            startTimer()
+        }
     }
 
     private fun startTimer() {
+        timerJob?.cancel()
         timerJob = viewModelScope.launch {
             while (_isSessionActive.value && !_isSessionFinished.value) {
                 delay(1000)
@@ -307,6 +320,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
 
     fun onUserInputChange(newText: String) {
         if (!_isSessionActive.value || _isSessionFinished.value) return
+        ensureTimerStarted()
 
         val target = _targetText.value
         // If in Paper Mode, do not cap by target.length - allow full continuous transcription from physical paper
@@ -332,6 +346,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
 
     fun handlePhysicalKey(keyChar: Char) {
         if (!_isSessionActive.value || _isSessionFinished.value) return
+        ensureTimerStarted()
 
         if (keyChar == '\n') {
             onUserInputChange(_userInput.value + "\n")
@@ -348,6 +363,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
 
     fun handleBackspace() {
         if (!_isSessionActive.value || _isSessionFinished.value) return
+        ensureTimerStarted()
         if (_userInput.value.isNotEmpty()) {
             _userInput.value = _userInput.value.dropLast(1)
             com.example.data.bijoy.BijoyLayoutEngine.onBackspace()
@@ -360,6 +376,9 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
 
     fun onPhysicalKeyEvent(event: android.view.KeyEvent): Boolean {
         if (!_isSessionActive.value || _isSessionFinished.value) return false
+        if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+            ensureTimerStarted()
+        }
 
         val keyCode = event.keyCode
 
@@ -486,6 +505,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     fun finishSession() {
         if (_isSessionFinished.value) return
         timerJob?.cancel()
+        _isTimerRunning.value = false
         _isSessionActive.value = false
         _isSessionFinished.value = true
 

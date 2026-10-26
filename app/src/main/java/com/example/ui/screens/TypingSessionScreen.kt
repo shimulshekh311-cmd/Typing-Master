@@ -83,6 +83,7 @@ fun TypingSessionScreen(
     val targetText by viewModel.targetText.collectAsStateWithLifecycle()
     val sessionTitle by viewModel.sessionTitle.collectAsStateWithLifecycle()
     val userInput by viewModel.userInput.collectAsStateWithLifecycle()
+    val isTimerRunning by viewModel.isTimerRunning.collectAsStateWithLifecycle()
     val elapsedSeconds by viewModel.elapsedSeconds.collectAsStateWithLifecycle()
     val timeLimitSeconds by viewModel.timeLimitSeconds.collectAsStateWithLifecycle()
     val liveWpm by viewModel.liveWpm.collectAsStateWithLifecycle()
@@ -219,6 +220,7 @@ fun TypingSessionScreen(
                 language = selectedLanguage,
                 inputLayoutMode = inputLayoutMode,
                 isPaperMode = isPaperMode,
+                isTimerRunning = isTimerRunning,
                 onTogglePaperMode = { viewModel.togglePaperMode() },
                 focusRequester = focusRequester,
                 onValueChange = { viewModel.onUserInputChange(it) },
