@@ -264,7 +264,7 @@ fun AdBannerView(
                                         adMobErrorDetails = error.message
 
                                         val msg = when (error.code) {
-                                            3 -> "গুগল অ্যাকাউন্ট পর্যালোচনাধীন (Error 3: No-Fill) — ২৪-৪৮ ঘণ্টার মধ্যে লাইভ বিজ্ঞাপন আসবে"
+                                            3 -> "গুগল অ্যাকাউন্ট পর্যালোচনাধীন (Error 3: No-Fill)"
                                             2 -> "নেটওয়ার্ক সমস্যা (Error 2: Network Error)"
                                             1 -> "অ্যাড ইউনিট কনফিগারেশন সঠিক নয় (Error 1: Invalid Request)"
                                             0 -> "অভ্যন্তরীণ ত্রুটি (Error 0: Internal Error)"
@@ -283,68 +283,6 @@ fun AdBannerView(
                             }
                         }
                     )
-
-                    // Minimal AdMob placeholder while loading or reviewing
-                    if (!isAdMobLoaded) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                                ) {
-                                    Text(
-                                        text = "Google AdMob",
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
-                                Text(
-                                    text = if (adStats.useGoogleTestUnits) "গুগল টেস্ট ব্যানার লোড হচ্ছে..." else "বিজ্ঞাপন লোড হচ্ছে...",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                IconButton(
-                                    onClick = { showDiagnosisDialog = true },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Info,
-                                        contentDescription = "AdMob Status & Diagnosis",
-                                        tint = AmberWarning,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                                IconButton(
-                                    onClick = { isDismissedForSession = true },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Close Ad",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }

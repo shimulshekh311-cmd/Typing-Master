@@ -145,7 +145,7 @@ fun HomeScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("👥 ১৯,০০০ সদস্যের ফেসবুক গ্রুপ", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("👥 টাইপিং কমিউনিটি গ্রুপ", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             Icon(Icons.Default.OpenInNew, contentDescription = null, tint = CyanAccent, modifier = Modifier.size(16.dp))
                         }
                     }
