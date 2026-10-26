@@ -153,7 +153,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
 
     // Preferences
     val hapticEnabled = MutableStateFlow(true)
-    val virtualKeyboardEnabled = MutableStateFlow(true)
+    val virtualKeyboardEnabled = MutableStateFlow(false)
 
     // Scoreboard Filtering
     private val _filterLanguage = MutableStateFlow("ALL")
@@ -241,14 +241,18 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
-    fun startSpeedTest(durationSecs: Int, difficulty: String) {
+    fun startSpeedTest(durationSecs: Int, difficulty: String = "Medium", chosenTitle: String? = null) {
         val lang = _selectedLanguage.value
         val paragraphs = if (lang == TypingLanguage.BANGLA) {
             LessonDataSource.speedTestParagraphsBangla
         } else {
             LessonDataSource.speedTestParagraphsEnglish
         }
-        val chosen = paragraphs.random()
+        val chosen = if (chosenTitle != null && chosenTitle.isNotBlank() && chosenTitle != "RANDOM") {
+            paragraphs.find { it.first == chosenTitle } ?: paragraphs.first()
+        } else {
+            paragraphs.random()
+        }
         _selectedMode.value = TypingMode.SPEED_TEST
         startSession(
             title = chosen.first,
@@ -453,6 +457,9 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
                 if (normTarget[i] != normInput[i]) {
                     mistakes++
                 }
+            }
+            if (normInput.length > normTarget.length) {
+                mistakes += (normInput.length - normTarget.length)
             }
             _mistakeCount.value = mistakes
 

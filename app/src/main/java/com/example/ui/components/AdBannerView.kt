@@ -60,7 +60,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.data.repository.AdCreative
 import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.EmeraldSuccess
@@ -80,7 +79,6 @@ fun AdBannerView(
 ) {
     val context = LocalContext.current
     val adStats by viewModel.adStats.collectAsStateWithLifecycle()
-    val currentCreative by viewModel.currentBannerCreative.collectAsStateWithLifecycle()
 
     var isDismissedForSession by remember { mutableStateOf(false) }
     var isAdMobLoaded by remember { mutableStateOf(false) }
@@ -220,14 +218,14 @@ fun AdBannerView(
             )
         }
 
-        // Real Google AdMob AdView Container
+        // Real Google AdMob AdView Container (Exclusively AdMob)
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("google_admob_banner_card"),
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             ),
             border = androidx.compose.foundation.BorderStroke(
                 width = 1.dp,
@@ -235,14 +233,16 @@ fun AdBannerView(
             )
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // If AdMob returned an actual ad from Google network
+                // Google AdMob AdView Box (Fixed standard banner height 50.dp)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(if (isAdMobLoaded) 52.dp else 0.dp),
+                        .height(50.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     AndroidView(
@@ -283,177 +283,70 @@ fun AdBannerView(
                             }
                         }
                     )
-                }
 
-                // If Google AdMob is still reviewing the account or no-fill returned, display graceful fallback with diagnosis
-                if (!isAdMobLoaded) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                handleAdClick(context, currentCreative, onNavigateToSpeedTest)
-                            }
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                    // Minimal AdMob placeholder while loading or reviewing
+                    if (!isAdMobLoaded) {
                         Row(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            // "Ad" Badge
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = Color(0xFFFFB300),
-                                modifier = Modifier.padding(end = 2.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(
-                                    text = "বিজ্ঞাপন",
-                                    color = Color.Black,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                                )
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(IndigoPrimary.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Campaign,
-                                    contentDescription = "Ad Icon",
-                                    tint = CyanAccent,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = currentCreative.headline,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = currentCreative.description,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            // AdMob Status Help Button
-                            IconButton(
-                                onClick = { showDiagnosisDialog = true },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "AdMob Status & Diagnosis",
-                                    tint = AmberWarning,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = CyanAccent.copy(alpha = 0.15f),
-                                border = androidx.compose.foundation.BorderStroke(0.8.dp, CyanAccent)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                                 ) {
                                     Text(
-                                        text = currentCreative.actionText,
-                                        style = MaterialTheme.typography.labelSmall,
+                                        text = "Google AdMob",
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = CyanAccent,
-                                        fontSize = 10.sp
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
+                                }
+                                Text(
+                                    text = if (adStats.useGoogleTestUnits) "গুগল টেস্ট ব্যানার লোড হচ্ছে..." else "বিজ্ঞাপন লোড হচ্ছে...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { showDiagnosisDialog = true },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
                                     Icon(
-                                        imageVector = Icons.Default.OpenInNew,
-                                        contentDescription = null,
-                                        tint = CyanAccent,
-                                        modifier = Modifier.size(12.dp)
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = "AdMob Status & Diagnosis",
+                                        tint = AmberWarning,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { isDismissedForSession = true },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Close Ad",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(14.dp)
                                     )
                                 }
                             }
-
-                            IconButton(
-                                onClick = { isDismissedForSession = true },
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Close Ad",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
                         }
-                    }
-
-                    // Explanatory info bar on why ads are warming up
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.4f))
-                            .clickable { showDiagnosisDialog = true }
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = if (adStats.useGoogleTestUnits) "⚡ টেস্ট মোড সক্রিয়: গুগল টেস্ট ব্যানার রিফ্রেশ হচ্ছে" else "ℹ️ লাইভ AdMob সক্রিয়: গুগল ২৪-৪৮ ঘণ্টার মধ্যে অ্যাকাউন্ট ভেরিফাই সম্পন্ন করবে (বিস্তারিত দেখুন)",
-                            fontSize = 9.sp,
-                            color = if (adStats.useGoogleTestUnits) EmeraldSuccess else AmberWarning,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = null,
-                            tint = if (adStats.useGoogleTestUnits) EmeraldSuccess else AmberWarning,
-                            modifier = Modifier.size(12.dp)
-                        )
                     }
                 }
             }
         }
-    }
-}
-
-private fun handleAdClick(
-    context: android.content.Context,
-    creative: AdCreative,
-    onNavigateToSpeedTest: (() -> Unit)?
-) {
-    if (creative.targetUrl == "app://speed_test") {
-        onNavigateToSpeedTest?.invoke()
-        return
-    }
-
-    try {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(creative.targetUrl))
-        context.startActivity(intent)
-    } catch (_: Exception) {
-        Toast.makeText(context, "লিংক ওপেন করা যাচ্ছে না", Toast.LENGTH_SHORT).show()
     }
 }

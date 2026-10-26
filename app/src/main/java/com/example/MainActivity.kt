@@ -53,12 +53,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Initialize Google Mobile Ads SDK asynchronously
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            try {
-                MobileAds.initialize(this@MainActivity) {}
-            } catch (_: Exception) {}
-        }
+        // Initialize Google Mobile Ads SDK safely
+        try {
+            MobileAds.initialize(this) {}
+        } catch (_: Exception) {}
 
         setContent {
             MyApplicationTheme {

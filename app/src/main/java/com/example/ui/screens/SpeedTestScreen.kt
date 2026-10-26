@@ -18,6 +18,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
@@ -62,14 +66,26 @@ fun SpeedTestScreen(
     onStartTest: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedDuration by remember { mutableIntStateOf(60) }
+    var selectedDuration by remember { mutableIntStateOf(120) }
     var selectedLanguage by remember { mutableStateOf(TypingLanguage.BANGLA) }
     var selectedDifficulty by remember { mutableStateOf("Medium") }
+    var selectedPassageTitle by remember(selectedLanguage) { mutableStateOf<String?>(null) }
+    var isPassageDropdownExpanded by remember { mutableStateOf(false) }
 
-    val sampleParagraph = if (selectedLanguage == TypingLanguage.BANGLA) {
-        LessonDataSource.speedTestParagraphsBangla.first().second
-    } else {
-        LessonDataSource.speedTestParagraphsEnglish.first().second
+    val availableParagraphs = remember(selectedLanguage) {
+        if (selectedLanguage == TypingLanguage.BANGLA) {
+            LessonDataSource.speedTestParagraphsBangla
+        } else {
+            LessonDataSource.speedTestParagraphsEnglish
+        }
+    }
+
+    val activeParagraphPair = remember(selectedPassageTitle, availableParagraphs) {
+        if (selectedPassageTitle != null && selectedPassageTitle != "RANDOM") {
+            availableParagraphs.find { it.first == selectedPassageTitle } ?: availableParagraphs.first()
+        } else {
+            availableParagraphs.first()
+        }
     }
 
     LazyColumn(
@@ -245,7 +261,7 @@ fun SpeedTestScreen(
             }
         }
 
-        // Duration Select (30s, 60s, 120s)
+        // Duration Select (2 min / 120s, 5 min / 300s, 10 min / 600s)
         item {
             Text(
                 text = "সময়সীমা নির্বাচন (Select Duration)",
@@ -258,36 +274,177 @@ fun SpeedTestScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 DurationOption(
-                    title = "৩০ সেকেন্ড",
-                    seconds = 30,
-                    subtitle = "দ্রুত স্প্রিন্ট",
-                    isSelected = selectedDuration == 30,
-                    onClick = { selectedDuration = 30 },
-                    modifier = Modifier.weight(1f)
-                )
-                DurationOption(
-                    title = "১ মিনিট",
-                    seconds = 60,
-                    subtitle = "প্রমিত পরীক্ষা",
-                    isSelected = selectedDuration == 60,
-                    onClick = { selectedDuration = 60 },
-                    modifier = Modifier.weight(1f)
-                )
-                DurationOption(
                     title = "২ মিনিট",
                     seconds = 120,
-                    subtitle = "ধৈর্য্য পরীক্ষা",
+                    subtitle = "দ্রুত টেস্ট",
                     isSelected = selectedDuration == 120,
                     onClick = { selectedDuration = 120 },
                     modifier = Modifier.weight(1f)
                 )
+                DurationOption(
+                    title = "৫ মিনিট",
+                    seconds = 300,
+                    subtitle = "সরকারি চাকরি",
+                    isSelected = selectedDuration == 300,
+                    onClick = { selectedDuration = 300 },
+                    modifier = Modifier.weight(1f)
+                )
+                DurationOption(
+                    title = "১০ মিনিট",
+                    seconds = 600,
+                    subtitle = "পূর্ণ ব্যবহারিক",
+                    isSelected = selectedDuration == 600,
+                    onClick = { selectedDuration = 600 },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // Passage Selection Card (Government Job typing test passages + General)
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "অনুচ্ছেদ বেছে নিন (Choose Passage)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "${availableParagraphs.size} টি অনুচ্ছেদ উপলব্ধ",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = CyanAccent
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable { isPassageDropdownExpanded = !isPassageDropdownExpanded },
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                ),
+                border = CardDefaults.outlinedCardBorder()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Article,
+                                contentDescription = null,
+                                tint = CyanAccent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = selectedPassageTitle ?: "🎲 এলোমেলো অনুচ্ছেদ (স্বয়ংক্রিয় নির্বাচন)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Icon(
+                            imageVector = if (isPassageDropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                            contentDescription = "Expand",
+                            tint = CyanAccent
+                        )
+                    }
+
+                    if (isPassageDropdownExpanded) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        // Random option
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    selectedPassageTitle = null
+                                    isPassageDropdownExpanded = false
+                                }
+                                .padding(vertical = 2.dp),
+                            color = if (selectedPassageTitle == null) CyanAccent.copy(alpha = 0.2f) else Color.Transparent,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "🎲 এলোমেলো অনুচ্ছেদ (স্বয়ংক্রিয় নির্বাচন)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (selectedPassageTitle == null) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (selectedPassageTitle == null) CyanAccent else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (selectedPassageTitle == null) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = CyanAccent,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Available passages
+                        availableParagraphs.forEach { pair ->
+                            val isSelected = selectedPassageTitle == pair.first
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        selectedPassageTitle = pair.first
+                                        isPassageDropdownExpanded = false
+                                    }
+                                    .padding(vertical = 2.dp),
+                                color = if (isSelected) CyanAccent.copy(alpha = 0.2f) else Color.Transparent,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = pair.first,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) CyanAccent else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = CyanAccent,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
         // Paragraph Preview Card
         item {
             Text(
-                text = "অনুচ্ছেদ নমুনা (Preview)",
+                text = "নির্বাচিত অনুচ্ছেদ নমুনা (Preview)",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -302,9 +459,16 @@ fun SpeedTestScreen(
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        text = "\"${sampleParagraph.take(150)}...\"",
+                        text = activeParagraphPair.first,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = CyanAccent
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = activeParagraphPair.second,
                         style = MaterialTheme.typography.bodyMedium,
-                        lineHeight = 22.sp,
+                        lineHeight = 24.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -314,10 +478,16 @@ fun SpeedTestScreen(
         // Big Launch Button
         item {
             Spacer(modifier = Modifier.height(6.dp))
+            val durationLabel = when (selectedDuration) {
+                120 -> "২ মিনিট"
+                300 -> "৫ মিনিট"
+                600 -> "১০ মিনিট"
+                else -> "${selectedDuration / 60} মিনিট"
+            }
             Button(
                 onClick = {
                     viewModel.setSelectedLanguage(selectedLanguage)
-                    viewModel.startSpeedTest(selectedDuration, selectedDifficulty)
+                    viewModel.startSpeedTest(selectedDuration, selectedDifficulty, selectedPassageTitle)
                     onStartTest()
                 },
                 modifier = Modifier
@@ -334,7 +504,7 @@ fun SpeedTestScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "পরীক্ষা শুরু করুন ($selectedDuration সেকেন্ড)",
+                    text = "পরীক্ষা শুরু করুন ($durationLabel)",
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimary

@@ -60,11 +60,14 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
@@ -143,20 +146,39 @@ fun LiveTypingDisplay(
     }
     val currentWordIndex = (typedWords.size - 1).coerceAtLeast(0)
 
-    // AUTO-SCROLL Sample Box: Keeps the active word in the viewport
-    LaunchedEffect(currentWordIndex, sampleScrollState.maxValue) {
-        if (targetWords.isNotEmpty() && sampleScrollState.maxValue > 0) {
-            val fraction = (currentWordIndex.toFloat() / targetWords.size.toFloat()).coerceIn(0f, 1f)
-            val targetScroll = (fraction * sampleScrollState.maxValue).toInt()
-            sampleScrollState.animateScrollTo(targetScroll.coerceIn(0, sampleScrollState.maxValue))
-        }
+    // Measured Layout Result and Container Height for Line-by-Line Auto-Scrolling
+    var sampleTextLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var sampleBoxHeightPx by remember { mutableStateOf(0) }
+
+    val currentCursorOffset = userInput.length.coerceIn(0, targetText.length)
+    val currentLineIndex = remember(currentCursorOffset, sampleTextLayoutResult) {
+        sampleTextLayoutResult?.let { layout ->
+            if (layout.lineCount > 0) {
+                layout.getLineForOffset(currentCursorOffset)
+            } else 0
+        } ?: 0
     }
 
-    // AUTO-SCROLL Typing Box: Automatically scrolls to the bottom / cursor as new lines or words are typed
-    LaunchedEffect(userInput, typedScrollState.maxValue) {
-        if (typedScrollState.maxValue > 0) {
-            typedScrollState.animateScrollTo(typedScrollState.maxValue)
+    // LINE-BY-LINE SYNCHRONIZED SCROLLING:
+    // The initial lines visible from the start do not scroll until the user reaches near the bottom of the initial view.
+    // Once that threshold is reached, both the sample box and typing box scroll down by exactly ONE line for each completed line.
+    LaunchedEffect(currentLineIndex, sampleTextLayoutResult, sampleBoxHeightPx) {
+        val layout = sampleTextLayoutResult ?: return@LaunchedEffect
+        if (layout.lineCount <= 1) return@LaunchedEffect
+
+        val singleLineHeightPx = (layout.getLineBottom(0) - layout.getLineTop(0)).toInt().coerceAtLeast(1)
+        val visibleLinesCount = if (sampleBoxHeightPx > 0) {
+            (sampleBoxHeightPx / singleLineHeightPx).coerceAtLeast(2)
+        } else {
+            if (isLandscape) 4 else 5
         }
+
+        val thresholdLine = (visibleLinesCount - 2).coerceAtLeast(1)
+        val targetScrollLine = (currentLineIndex - thresholdLine).coerceAtLeast(0)
+        val targetScrollPx = (targetScrollLine * singleLineHeightPx).coerceIn(0, sampleScrollState.maxValue)
+
+        sampleScrollState.animateScrollTo(targetScrollPx)
+        typedScrollState.animateScrollTo(targetScrollPx.coerceIn(0, typedScrollState.maxValue))
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -374,7 +396,9 @@ fun LiveTypingDisplay(
             targetWords.forEachIndexed { index, word ->
                 when {
                     index < currentWordIndex -> {
-                        val isCorrect = index < typedWords.size && typedWords[index] == word
+                        val isCorrect = index < typedWords.size && 
+                            java.text.Normalizer.normalize(typedWords[index], java.text.Normalizer.Form.NFC) == 
+                            java.text.Normalizer.normalize(word, java.text.Normalizer.Form.NFC)
                         val color = if (isCorrect) EmeraldSuccess else RoseError
                         withStyle(
                             SpanStyle(
@@ -414,6 +438,26 @@ fun LiveTypingDisplay(
                 }
             }
         }
+
+        // Typed text with inline cursor - ensures 100% identical line breaks, spaces, and margins as sample text
+        val typedAnnotatedString = buildAnnotatedString {
+            append(userInput)
+            withStyle(
+                SpanStyle(
+                    color = if (isBanglaBijoy) IndigoPrimary else CyanAccent,
+                    fontWeight = FontWeight.Bold
+                )
+            ) {
+                append("▍")
+            }
+        }
+
+        // 100% Identical formatting parameters for both Sample Box and Typing Box
+        val sharedFontSize = if (isLandscape) 19.sp else 21.sp
+        val sharedLineHeight = if (isLandscape) 32.sp else 35.sp
+        val sharedLetterSpacing = 0.sp
+        val sharedFontFamily = FontFamily.SansSerif
+        val sharedFontWeight = FontWeight.Medium
 
         // Shared Preview Key Event Handler for physical keyboard
         val onKeyModifier = Modifier.onPreviewKeyEvent { keyEvent ->
@@ -605,10 +649,16 @@ fun LiveTypingDisplay(
                         ) {
                             Text(
                                 text = annotatedText,
-                                fontSize = 20.sp,
-                                lineHeight = 32.sp,
-                                letterSpacing = 0.5.sp,
-                                modifier = Modifier.fillMaxWidth()
+                                fontSize = sharedFontSize,
+                                lineHeight = sharedLineHeight,
+                                letterSpacing = sharedLetterSpacing,
+                                fontFamily = sharedFontFamily,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onSizeChanged { size -> sampleBoxHeightPx = size.height },
+                                onTextLayout = { layoutResult ->
+                                    sampleTextLayoutResult = layoutResult
+                                }
                             )
                         }
                     }
@@ -671,27 +721,23 @@ fun LiveTypingDisplay(
                             if (userInput.isEmpty()) {
                                 Text(
                                     text = if (isBanglaBijoy) "এক্সটার্নাল কিবোর্ড দিয়ে লিখুন (J=ক, Shift+J=খ)..." else "টাইপিং শুরু করুন...",
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontSize = sharedFontSize,
+                                    lineHeight = sharedLineHeight,
+                                    letterSpacing = sharedLetterSpacing,
+                                    fontFamily = sharedFontFamily,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                 )
                             } else {
-                                Row(modifier = Modifier.fillMaxWidth()) {
-                                    Text(
-                                        text = userInput,
-                                        fontSize = 20.sp,
-                                        lineHeight = 32.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.weight(1f, fill = false)
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .size(width = 3.dp, height = 20.dp)
-                                            .clip(RoundedCornerShape(2.dp))
-                                            .background(if (isBanglaBijoy) IndigoPrimary else CyanAccent)
-                                    )
-                                }
+                                Text(
+                                    text = typedAnnotatedString,
+                                    fontSize = sharedFontSize,
+                                    lineHeight = sharedLineHeight,
+                                    letterSpacing = sharedLetterSpacing,
+                                    fontFamily = sharedFontFamily,
+                                    fontWeight = sharedFontWeight,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         }
                     }
@@ -699,15 +745,15 @@ fun LiveTypingDisplay(
             }
         } else {
             // ==========================================
-            // PORTRAIT MODE: VERTICALLY STACKED
-            // Top: Sample Box (Auto-scrolling)
-            // Bottom: Typing Box (Multi-line, Auto-scrolling)
+            // PORTRAIT MODE: VERTICALLY STACKED & ENLARGED
+            // Top: Sample Box (Auto-scrolling, 250dp)
+            // Bottom: Typing Box (Multi-line, Auto-scrolling, 230dp)
             // ==========================================
-            // Sample Box
+            // Sample Box (Enlarged for desktop-grade practice)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
+                    .height(250.dp)
                     .clickable {
                         try {
                             focusRequester.requestFocus()
@@ -729,7 +775,7 @@ fun LiveTypingDisplay(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 4.dp),
+                            .padding(bottom = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -755,10 +801,16 @@ fun LiveTypingDisplay(
                     ) {
                         Text(
                             text = annotatedText,
-                            fontSize = 22.sp,
-                            lineHeight = 36.sp,
-                            letterSpacing = 0.5.sp,
-                            modifier = Modifier.fillMaxWidth()
+                            fontSize = sharedFontSize,
+                            lineHeight = sharedLineHeight,
+                            letterSpacing = sharedLetterSpacing,
+                            fontFamily = sharedFontFamily,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onSizeChanged { size -> sampleBoxHeightPx = size.height },
+                            onTextLayout = { layoutResult ->
+                                sampleTextLayoutResult = layoutResult
+                            }
                         )
                     }
                 }
@@ -766,11 +818,11 @@ fun LiveTypingDisplay(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Typing Box
+            // Typing Box (Enlarged for desktop-grade practice)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
+                    .height(230.dp)
                     .focusRequester(focusRequester)
                     .focusable()
                     .clickable {
@@ -796,7 +848,7 @@ fun LiveTypingDisplay(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 4.dp),
+                            .padding(bottom = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -823,27 +875,23 @@ fun LiveTypingDisplay(
                         if (userInput.isEmpty()) {
                             Text(
                                 text = if (isBanglaBijoy) "এক্সটার্নাল কিবোর্ড থেকে সরাসরি টাইপ করুন (J=ক, Shift+J=খ)..." else "টাইপিং শুরু করুন...",
-                                style = MaterialTheme.typography.bodyMedium,
+                                fontSize = sharedFontSize,
+                                lineHeight = sharedLineHeight,
+                                letterSpacing = sharedLetterSpacing,
+                                fontFamily = sharedFontFamily,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
                         } else {
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = userInput,
-                                    fontSize = 20.sp,
-                                    lineHeight = 32.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f, fill = false)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .size(width = 3.dp, height = 20.dp)
-                                        .clip(RoundedCornerShape(2.dp))
-                                        .background(if (isBanglaBijoy) IndigoPrimary else CyanAccent)
-                                )
-                            }
+                            Text(
+                                text = typedAnnotatedString,
+                                fontSize = sharedFontSize,
+                                lineHeight = sharedLineHeight,
+                                letterSpacing = sharedLetterSpacing,
+                                fontFamily = sharedFontFamily,
+                                fontWeight = sharedFontWeight,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
                     }
                 }
