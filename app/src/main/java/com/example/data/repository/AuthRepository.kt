@@ -47,11 +47,26 @@ class AuthRepository(
         )
     }
 
+    private fun resolveWebClientId(context: Context): String? {
+        val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+        if (resId != 0) {
+            val id = context.getString(resId)
+            if (id.isNotBlank()) return id
+        }
+        return null
+    }
+
     suspend fun signInWithGoogle(context: Context): Result<FirebaseUser> {
         return try {
-            val credentialManager = CredentialManager.create(context)
-            val webClientId = context.getString(R.string.default_web_client_id)
+            val webClientId = resolveWebClientId(context)
+            if (webClientId.isNullOrBlank()) {
+                Log.e(TAG, "Google Web Client ID resource not found. Ensure google-services.json is present in app/ module.")
+                return Result.failure(
+                    IllegalStateException("গুগল কনফিগারেশন (Web Client ID) পাওয়া যায়নি। app/ ফোল্ডারে google-services.json ফাইলটি নিশ্চিত করুন।")
+                )
+            }
 
+            val credentialManager = CredentialManager.create(context)
             val googleIdOption = GetSignInWithGoogleOption.Builder(webClientId)
                 .build()
 
