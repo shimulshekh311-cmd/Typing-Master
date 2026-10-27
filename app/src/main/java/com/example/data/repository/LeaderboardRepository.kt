@@ -3,7 +3,6 @@ package com.example.data.repository
 import android.content.Context
 import android.util.Log
 import com.example.data.model.LeaderboardEntry
-import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
@@ -24,40 +23,13 @@ class LeaderboardRepository(
         private const val COLLECTION_NAME = "leaderboard"
     }
 
-    private val db: FirebaseFirestore? by lazy {
-        try {
-            if (FirebaseApp.getApps(context).isEmpty()) {
-                FirebaseApp.initializeApp(context)
-            }
-            val dbIdRes = context.resources.getIdentifier("firestore_database_id", "string", context.packageName)
-            val dbId = if (dbIdRes != 0) context.getString(dbIdRes) else null
-            if (!dbId.isNullOrBlank()) {
-                FirebaseFirestore.getInstance(dbId)
-            } else {
-                null
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "FirebaseFirestore could not be initialized: ${e.message}")
-            null
-        }
-    }
-
-    private val auth: FirebaseAuth? by lazy {
-        try {
-            if (FirebaseApp.getApps(context).isEmpty()) {
-                FirebaseApp.initializeApp(context)
-            }
-            FirebaseAuth.getInstance()
-        } catch (e: Throwable) {
-            Log.e(TAG, "FirebaseAuth could not be initialized: ${e.message}")
-            null
-        }
-    }
+    private fun getDb(): FirebaseFirestore? = FirebaseHelper.getFirestore(context)
+    private fun getAuth(): FirebaseAuth? = FirebaseHelper.getAuth(context)
 
     fun observeLeaderboard(languageFilter: String = "ALL"): Flow<List<LeaderboardEntry>> = callbackFlow {
-        val currentDb = db
-        val currentAuth = auth
-        if (currentDb == null || currentAuth == null || currentAuth.currentUser == null) {
+        val db = getDb()
+        val auth = getAuth()
+        if (db == null || auth == null || auth.currentUser == null) {
             trySend(emptyList())
             awaitClose { }
             return@callbackFlow
@@ -65,7 +37,7 @@ class LeaderboardRepository(
 
         var listener: ListenerRegistration? = null
         try {
-            val query = currentDb.collection(COLLECTION_NAME)
+            val query = db.collection(COLLECTION_NAME)
                 .orderBy("highestWpm", Query.Direction.DESCENDING)
                 .limit(100)
 
@@ -122,11 +94,12 @@ class LeaderboardRepository(
     }
 
     suspend fun getUserRecord(userId: String): LeaderboardEntry? {
-        val currentDb = db ?: return null
-        val currentAuth = auth ?: return null
-        if (currentAuth.currentUser == null) return null
+        val db = getDb() ?: return null
+        val auth = getAuth() ?: return null
+        if (auth.currentUser == null) return null
+
         return try {
-            val doc = currentDb.collection(COLLECTION_NAME).document(userId).get().await()
+            val doc = db.collection(COLLECTION_NAME).document(userId).get().await()
             if (doc.exists()) {
                 val displayName = doc.getString("displayName") ?: "ব্যবহারকারী"
                 val photoUrl = doc.getString("photoUrl") ?: ""
@@ -155,10 +128,10 @@ class LeaderboardRepository(
     }
 
     suspend fun recordPersonalBest(wpm: Int, accuracy: Float, language: String): Result<Boolean> {
-        val currentDb = db ?: return Result.failure(IllegalStateException("Database not available"))
-        val currentAuth = auth ?: return Result.failure(IllegalStateException("Auth not available"))
-        val user = currentAuth.currentUser ?: return Result.failure(IllegalStateException("User is not signed in"))
-        val docRef = currentDb.collection(COLLECTION_NAME).document(user.uid)
+        val db = getDb() ?: return Result.failure(IllegalStateException("Database not available"))
+        val auth = getAuth() ?: return Result.failure(IllegalStateException("Auth not available"))
+        val user = auth.currentUser ?: return Result.failure(IllegalStateException("User is not signed in"))
+        val docRef = db.collection(COLLECTION_NAME).document(user.uid)
 
         return try {
             val existing = getUserRecord(user.uid)

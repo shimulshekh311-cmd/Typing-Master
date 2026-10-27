@@ -10,7 +10,6 @@ import androidx.credentials.exceptions.GetCredentialException
 import com.example.data.model.UserProfile
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -26,24 +25,14 @@ class AuthRepository(
         private const val TAG = "AuthRepository"
     }
 
-    private val auth: FirebaseAuth? by lazy {
-        try {
-            if (FirebaseApp.getApps(context).isEmpty()) {
-                FirebaseApp.initializeApp(context)
-            }
-            FirebaseAuth.getInstance()
-        } catch (e: Throwable) {
-            Log.e(TAG, "FirebaseAuth could not be initialized: ${e.message}")
-            null
-        }
-    }
+    private fun getAuth(): FirebaseAuth? = FirebaseHelper.getAuth(context)
 
     val currentUser: FirebaseUser?
-        get() = try { auth?.currentUser } catch (_: Throwable) { null }
+        get() = try { getAuth()?.currentUser } catch (_: Throwable) { null }
 
     fun getAuthStateFlow(): Flow<FirebaseUser?> = callbackFlow {
-        val currentAuth = auth
-        if (currentAuth == null) {
+        val auth = getAuth()
+        if (auth == null) {
             trySend(null)
             awaitClose { }
             return@callbackFlow
@@ -52,13 +41,13 @@ class AuthRepository(
             trySend(firebaseAuth.currentUser)
         }
         try {
-            currentAuth.addAuthStateListener(listener)
-        } catch (e: Throwable) {
+            auth.addAuthStateListener(listener)
+        } catch (_: Throwable) {
             trySend(null)
         }
         awaitClose {
             try {
-                currentAuth.removeAuthStateListener(listener)
+                auth.removeAuthStateListener(listener)
             } catch (_: Throwable) {}
         }
     }
@@ -73,29 +62,12 @@ class AuthRepository(
         )
     }
 
-    private fun resolveWebClientId(context: Context): String? {
-        val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
-        if (resId != 0) {
-            val id = context.getString(resId)
-            if (id.isNotBlank()) return id
-        }
-        return null
-    }
-
     suspend fun signInWithGoogle(context: Context): Result<FirebaseUser> {
-        val currentAuth = auth
-        if (currentAuth == null) {
-            return Result.failure(IllegalStateException("Firebase Auth সার্ভিস প্রস্তুত নয়।"))
-        }
-        return try {
-            val webClientId = resolveWebClientId(context)
-            if (webClientId.isNullOrBlank()) {
-                Log.e(TAG, "Google Web Client ID resource not found. Ensure google-services.json is present in app/ module.")
-                return Result.failure(
-                    IllegalStateException("গুগল কনফিগারেশন (Web Client ID) পাওয়া যায়নি। app/ ফোল্ডারে google-services.json ফাইলটি নিশ্চিত করুন।")
-                )
-            }
+        val auth = getAuth()
+            ?: return Result.failure(IllegalStateException("Firebase Auth সার্ভিস প্রস্তুত করা সম্ভব হয়নি।"))
 
+        return try {
+            val webClientId = FirebaseHelper.getWebClientId(context)
             val credentialManager = CredentialManager.create(context)
             val googleIdOption = GetSignInWithGoogleOption.Builder(webClientId)
                 .build()
@@ -113,7 +85,7 @@ class AuthRepository(
             if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                 val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                 val authCredential = GoogleAuthProvider.getCredential(googleIdTokenCredential.idToken, null)
-                val authResult = currentAuth.signInWithCredential(authCredential).await()
+                val authResult = auth.signInWithCredential(authCredential).await()
                 val user = authResult.user
                 if (user != null) {
                     Result.success(user)
@@ -127,7 +99,7 @@ class AuthRepository(
             Log.d(TAG, "Google Sign-In cancelled by user")
             Result.failure(e)
         } catch (e: GetCredentialException) {
-            Log.e(TAG, "CredentialManager error during sign in: ${e.message}", e)
+            Log.e(TAG, "CredentialManager error: ${e.message}", e)
             Result.failure(e)
         } catch (e: Throwable) {
             Log.e(TAG, "Unexpected error during Google Sign In: ${e.message}", e)
@@ -137,7 +109,7 @@ class AuthRepository(
 
     fun signOut() {
         try {
-            auth?.signOut()
+            getAuth()?.signOut()
         } catch (e: Throwable) {
             Log.e(TAG, "Sign out error", e)
         }

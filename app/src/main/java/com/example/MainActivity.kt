@@ -54,11 +54,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         // Safely initialize Firebase App
-        try {
-            com.google.firebase.FirebaseApp.initializeApp(applicationContext)
-        } catch (e: Throwable) {
-            android.util.Log.e("MainActivity", "FirebaseApp initialization: ${e.message}")
-        }
+        com.example.data.repository.FirebaseHelper.ensureInitialized(applicationContext)
 
         // Initialize Google Mobile Ads SDK safely
         try {
