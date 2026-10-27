@@ -7,10 +7,10 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
-import com.example.R
 import com.example.data.model.UserProfile
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -20,25 +20,51 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 class AuthRepository(
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val context: Context
 ) {
     companion object {
         private const val TAG = "AuthRepository"
     }
 
+    private val auth: FirebaseAuth? by lazy {
+        try {
+            if (FirebaseApp.getApps(context).isEmpty()) {
+                FirebaseApp.initializeApp(context)
+            }
+            FirebaseAuth.getInstance()
+        } catch (e: Throwable) {
+            Log.e(TAG, "FirebaseAuth could not be initialized: ${e.message}")
+            null
+        }
+    }
+
     val currentUser: FirebaseUser?
-        get() = auth.currentUser
+        get() = try { auth?.currentUser } catch (_: Throwable) { null }
 
     fun getAuthStateFlow(): Flow<FirebaseUser?> = callbackFlow {
+        val currentAuth = auth
+        if (currentAuth == null) {
+            trySend(null)
+            awaitClose { }
+            return@callbackFlow
+        }
         val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
             trySend(firebaseAuth.currentUser)
         }
-        auth.addAuthStateListener(listener)
-        awaitClose { auth.removeAuthStateListener(listener) }
+        try {
+            currentAuth.addAuthStateListener(listener)
+        } catch (e: Throwable) {
+            trySend(null)
+        }
+        awaitClose {
+            try {
+                currentAuth.removeAuthStateListener(listener)
+            } catch (_: Throwable) {}
+        }
     }
 
     fun getUserProfile(): UserProfile? {
-        val user = auth.currentUser ?: return null
+        val user = currentUser ?: return null
         return UserProfile(
             uid = user.uid,
             displayName = user.displayName?.ifBlank { "ব্যবহারকারী" } ?: "ব্যবহারকারী",
@@ -57,6 +83,10 @@ class AuthRepository(
     }
 
     suspend fun signInWithGoogle(context: Context): Result<FirebaseUser> {
+        val currentAuth = auth
+        if (currentAuth == null) {
+            return Result.failure(IllegalStateException("Firebase Auth সার্ভিস প্রস্তুত নয়।"))
+        }
         return try {
             val webClientId = resolveWebClientId(context)
             if (webClientId.isNullOrBlank()) {
@@ -83,7 +113,7 @@ class AuthRepository(
             if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                 val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                 val authCredential = GoogleAuthProvider.getCredential(googleIdTokenCredential.idToken, null)
-                val authResult = auth.signInWithCredential(authCredential).await()
+                val authResult = currentAuth.signInWithCredential(authCredential).await()
                 val user = authResult.user
                 if (user != null) {
                     Result.success(user)
@@ -99,13 +129,17 @@ class AuthRepository(
         } catch (e: GetCredentialException) {
             Log.e(TAG, "CredentialManager error during sign in: ${e.message}", e)
             Result.failure(e)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Unexpected error during Google Sign In: ${e.message}", e)
-            Result.failure(e)
+            Result.failure(Exception(e.message ?: "Sign-in failed"))
         }
     }
 
     fun signOut() {
-        auth.signOut()
+        try {
+            auth?.signOut()
+        } catch (e: Throwable) {
+            Log.e(TAG, "Sign out error", e)
+        }
     }
 }

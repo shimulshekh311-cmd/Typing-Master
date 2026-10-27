@@ -2,13 +2,13 @@ package com.example.data.repository
 
 import android.content.Context
 import android.util.Log
-import com.example.R
 import com.example.data.model.LeaderboardEntry
-import com.google.firebase.Timestamp
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
@@ -17,81 +17,116 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 class LeaderboardRepository(
-    private val db: FirebaseFirestore,
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val context: Context
 ) {
     companion object {
         private const val TAG = "LeaderboardRepository"
         private const val COLLECTION_NAME = "leaderboard"
     }
 
-    constructor(context: Context) : this(
-        FirebaseFirestore.getInstance(
-            context.applicationContext.getString(R.string.firestore_database_id)
-        )
-    )
+    private val db: FirebaseFirestore? by lazy {
+        try {
+            if (FirebaseApp.getApps(context).isEmpty()) {
+                FirebaseApp.initializeApp(context)
+            }
+            val dbIdRes = context.resources.getIdentifier("firestore_database_id", "string", context.packageName)
+            val dbId = if (dbIdRes != 0) context.getString(dbIdRes) else null
+            if (!dbId.isNullOrBlank()) {
+                FirebaseFirestore.getInstance(dbId)
+            } else {
+                null
+            }
+        } catch (e: Throwable) {
+            Log.e(TAG, "FirebaseFirestore could not be initialized: ${e.message}")
+            null
+        }
+    }
+
+    private val auth: FirebaseAuth? by lazy {
+        try {
+            if (FirebaseApp.getApps(context).isEmpty()) {
+                FirebaseApp.initializeApp(context)
+            }
+            FirebaseAuth.getInstance()
+        } catch (e: Throwable) {
+            Log.e(TAG, "FirebaseAuth could not be initialized: ${e.message}")
+            null
+        }
+    }
 
     fun observeLeaderboard(languageFilter: String = "ALL"): Flow<List<LeaderboardEntry>> = callbackFlow {
-        // If unauthenticated, emit empty list and do not call Firestore (prevents PERMISSION_DENIED)
-        if (auth.currentUser == null) {
+        val currentDb = db
+        val currentAuth = auth
+        if (currentDb == null || currentAuth == null || currentAuth.currentUser == null) {
             trySend(emptyList())
             awaitClose { }
             return@callbackFlow
         }
 
-        val query = db.collection(COLLECTION_NAME)
-            .orderBy("highestWpm", Query.Direction.DESCENDING)
-            .limit(100)
+        var listener: ListenerRegistration? = null
+        try {
+            val query = currentDb.collection(COLLECTION_NAME)
+                .orderBy("highestWpm", Query.Direction.DESCENDING)
+                .limit(100)
 
-        val listener = query.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                Log.w(TAG, "Error observing leaderboard: ${error.message}", error)
-                return@addSnapshotListener
-            }
+            listener = query.addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w(TAG, "Error observing leaderboard: ${error.message}", error)
+                    return@addSnapshotListener
+                }
 
-            if (snapshot != null) {
-                val entries = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        val userId = doc.getString("userId") ?: doc.id
-                        val displayName = doc.getString("displayName") ?: "ব্যবহারকারী"
-                        val photoUrl = doc.getString("photoUrl") ?: ""
-                        val highestWpm = doc.getLong("highestWpm") ?: 0L
-                        val highestAccuracy = doc.getLong("highestAccuracy") ?: 0L
-                        val language = doc.getString("language") ?: "english"
-                        val updatedAt = doc.getTimestamp("updatedAt", DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                if (snapshot != null) {
+                    val entries = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            val userId = doc.getString("userId") ?: doc.id
+                            val displayName = doc.getString("displayName") ?: "ব্যবহারকারী"
+                            val photoUrl = doc.getString("photoUrl") ?: ""
+                            val highestWpm = doc.getLong("highestWpm") ?: 0L
+                            val highestAccuracy = doc.getLong("highestAccuracy") ?: 0L
+                            val language = doc.getString("language") ?: "english"
+                            val updatedAt = doc.getTimestamp("updatedAt", DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
 
-                        LeaderboardEntry(
-                            id = doc.id,
-                            userId = userId,
-                            displayName = displayName,
-                            photoUrl = photoUrl,
-                            highestWpm = highestWpm,
-                            highestAccuracy = highestAccuracy,
-                            language = language,
-                            updatedAt = updatedAt
-                        )
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error parsing leaderboard entry ${doc.id}", e)
-                        null
+                            LeaderboardEntry(
+                                id = doc.id,
+                                userId = userId,
+                                displayName = displayName,
+                                photoUrl = photoUrl,
+                                highestWpm = highestWpm,
+                                highestAccuracy = highestAccuracy,
+                                language = language,
+                                updatedAt = updatedAt
+                            )
+                        } catch (e: Throwable) {
+                            null
+                        }
                     }
-                }
 
-                val filtered = when (languageFilter.uppercase()) {
-                    "BANGLA" -> entries.filter { it.language.equals("bangla", ignoreCase = true) }
-                    "ENGLISH" -> entries.filter { it.language.equals("english", ignoreCase = true) }
-                    else -> entries
+                    val filtered = when (languageFilter.uppercase()) {
+                        "BANGLA" -> entries.filter { it.language.equals("bangla", ignoreCase = true) }
+                        "ENGLISH" -> entries.filter { it.language.equals("english", ignoreCase = true) }
+                        else -> entries
+                    }
+                    trySend(filtered)
                 }
-                trySend(filtered)
             }
+        } catch (e: Throwable) {
+            Log.e(TAG, "Error attaching leaderboard listener: ${e.message}", e)
+            trySend(emptyList())
         }
 
-        awaitClose { listener.remove() }
+        awaitClose {
+            try {
+                listener?.remove()
+            } catch (_: Throwable) {}
+        }
     }
 
     suspend fun getUserRecord(userId: String): LeaderboardEntry? {
-        if (auth.currentUser == null) return null
+        val currentDb = db ?: return null
+        val currentAuth = auth ?: return null
+        if (currentAuth.currentUser == null) return null
         return try {
-            val doc = db.collection(COLLECTION_NAME).document(userId).get().await()
+            val doc = currentDb.collection(COLLECTION_NAME).document(userId).get().await()
             if (doc.exists()) {
                 val displayName = doc.getString("displayName") ?: "ব্যবহারকারী"
                 val photoUrl = doc.getString("photoUrl") ?: ""
@@ -113,21 +148,22 @@ class LeaderboardRepository(
             } else {
                 null
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Error fetching user record: ${e.message}", e)
             null
         }
     }
 
     suspend fun recordPersonalBest(wpm: Int, accuracy: Float, language: String): Result<Boolean> {
-        val user = auth.currentUser ?: return Result.failure(IllegalStateException("User is not signed in"))
-        val docRef = db.collection(COLLECTION_NAME).document(user.uid)
+        val currentDb = db ?: return Result.failure(IllegalStateException("Database not available"))
+        val currentAuth = auth ?: return Result.failure(IllegalStateException("Auth not available"))
+        val user = currentAuth.currentUser ?: return Result.failure(IllegalStateException("User is not signed in"))
+        val docRef = currentDb.collection(COLLECTION_NAME).document(user.uid)
 
         return try {
             val existing = getUserRecord(user.uid)
             val currentBestWpm = existing?.highestWpm?.toInt() ?: 0
 
-            // If current best is strictly higher, keep current best WPM
             val targetWpm = maxOf(currentBestWpm, wpm)
             val targetAccuracy = if (wpm >= currentBestWpm) accuracy.toInt() else (existing?.highestAccuracy?.toInt() ?: accuracy.toInt())
 
@@ -153,9 +189,9 @@ class LeaderboardRepository(
 
             docRef.set(payload, SetOptions.merge()).await()
             Result.success(true)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Failed to record personal best to leaderboard", e)
-            Result.failure(e)
+            Result.failure(Exception(e.message ?: "Record failed"))
         }
     }
 }

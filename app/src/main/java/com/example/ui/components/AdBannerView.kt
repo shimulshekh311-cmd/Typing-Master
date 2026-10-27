@@ -248,39 +248,46 @@ fun AdBannerView(
                     AndroidView(
                         modifier = Modifier.fillMaxWidth(),
                         factory = { ctx ->
-                            AdView(ctx).apply {
-                                setAdSize(AdSize.BANNER)
-                                adUnitId = adStats.activeBannerId
-                                adListener = object : AdListener() {
-                                    override fun onAdLoaded() {
-                                        isAdMobLoaded = true
-                                        viewModel.recordBannerImpression()
-                                        viewModel.setLastAdStatus("গুগল বিজ্ঞাপন সফলভাবে লোড হয়েছে (Ad Loaded)")
-                                    }
-
-                                    override fun onAdFailedToLoad(error: LoadAdError) {
-                                        isAdMobLoaded = false
-                                        adMobErrorCode = error.code
-                                        adMobErrorDetails = error.message
-
-                                        val msg = when (error.code) {
-                                            3 -> "গুগল অ্যাকাউন্ট পর্যালোচনাধীন (Error 3: No-Fill)"
-                                            2 -> "নেটওয়ার্ক সমস্যা (Error 2: Network Error)"
-                                            1 -> "অ্যাড ইউনিট কনফিগারেশন সঠিক নয় (Error 1: Invalid Request)"
-                                            0 -> "অভ্যন্তরীণ ত্রুটি (Error 0: Internal Error)"
-                                            else -> error.message
+                            try {
+                                AdView(ctx).apply {
+                                    setAdSize(AdSize.BANNER)
+                                    adUnitId = adStats.activeBannerId
+                                    adListener = object : AdListener() {
+                                        override fun onAdLoaded() {
+                                            isAdMobLoaded = true
+                                            viewModel.recordBannerImpression()
+                                            viewModel.setLastAdStatus("গুগল বিজ্ঞাপন সফলভাবে লোড হয়েছে (Ad Loaded)")
                                         }
-                                        viewModel.setLastAdStatus(msg)
+
+                                        override fun onAdFailedToLoad(error: LoadAdError) {
+                                            isAdMobLoaded = false
+                                            adMobErrorCode = error.code
+                                            adMobErrorDetails = error.message
+
+                                            val msg = when (error.code) {
+                                                3 -> "গুগল অ্যাকাউন্ট পর্যালোচনাধীন (Error 3: No-Fill)"
+                                                2 -> "নেটওয়ার্ক সমস্যা (Error 2: Network Error)"
+                                                1 -> "অ্যাড ইউনিট কনফিগারেশন সঠিক নয় (Error 1: Invalid Request)"
+                                                0 -> "অভ্যন্তরীণ ত্রুটি (Error 0: Internal Error)"
+                                                else -> error.message
+                                            }
+                                            viewModel.setLastAdStatus(msg)
+                                        }
                                     }
+                                    loadAd(AdRequest.Builder().build())
                                 }
-                                loadAd(AdRequest.Builder().build())
+                            } catch (e: Throwable) {
+                                android.util.Log.e("AdBannerView", "AdView creation failed: ${e.message}")
+                                android.view.View(ctx)
                             }
                         },
                         update = { view ->
-                            if (view.adUnitId != adStats.activeBannerId) {
-                                view.adUnitId = adStats.activeBannerId
-                                view.loadAd(AdRequest.Builder().build())
-                            }
+                            try {
+                                if (view is AdView && view.adUnitId != adStats.activeBannerId) {
+                                    view.adUnitId = adStats.activeBannerId
+                                    view.loadAd(AdRequest.Builder().build())
+                                }
+                            } catch (_: Throwable) {}
                         }
                     )
                 }

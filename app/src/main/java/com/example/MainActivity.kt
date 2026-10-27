@@ -53,10 +53,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Safely initialize Firebase App
+        try {
+            com.google.firebase.FirebaseApp.initializeApp(applicationContext)
+        } catch (e: Throwable) {
+            android.util.Log.e("MainActivity", "FirebaseApp initialization: ${e.message}")
+        }
+
         // Initialize Google Mobile Ads SDK safely
         try {
-            MobileAds.initialize(this) {}
-        } catch (_: Exception) {}
+            MobileAds.initialize(applicationContext) {}
+        } catch (_: Throwable) {}
 
         setContent {
             MyApplicationTheme {

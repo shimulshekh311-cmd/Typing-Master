@@ -37,7 +37,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     private val repository: TypingRepository
     private val subscriptionManager = SubscriptionManager.getInstance(application)
     private val adManager = AdManager.getInstance(application)
-    private val authRepository = com.example.data.repository.AuthRepository()
+    private val authRepository = com.example.data.repository.AuthRepository(application)
     private val leaderboardRepository = com.example.data.repository.LeaderboardRepository(application)
     private val vibrator = application.getSystemService(Vibrator::class.java)
 
@@ -106,17 +106,21 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
 
     fun syncBestLocalScoreToLeaderboard() {
         viewModelScope.launch {
-            val user = authRepository.currentUser ?: return@launch
-            val localResults = allResults.value
-            if (localResults.isNotEmpty()) {
-                val peakResult = localResults.maxByOrNull { it.wpm }
-                if (peakResult != null && peakResult.wpm > 0) {
-                    leaderboardRepository.recordPersonalBest(
-                        wpm = peakResult.wpm,
-                        accuracy = peakResult.accuracy,
-                        language = peakResult.language
-                    )
+            try {
+                val user = authRepository.currentUser ?: return@launch
+                val localResults = allResults.value
+                if (localResults.isNotEmpty()) {
+                    val peakResult = localResults.maxByOrNull { it.wpm }
+                    if (peakResult != null && peakResult.wpm > 0) {
+                        leaderboardRepository.recordPersonalBest(
+                            wpm = peakResult.wpm,
+                            accuracy = peakResult.accuracy,
+                            language = peakResult.language
+                        )
+                    }
                 }
+            } catch (e: Throwable) {
+                android.util.Log.e("TypingViewModel", "syncBestLocalScore error: ${e.message}")
             }
         }
     }
@@ -629,13 +633,21 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
 
         // Save into Room Database and sync to Firestore Leaderboard
         viewModelScope.launch {
-            repository.saveResult(result)
-            if (result.wpm > 0 && authRepository.currentUser != null) {
-                leaderboardRepository.recordPersonalBest(
-                    wpm = result.wpm,
-                    accuracy = result.accuracy,
-                    language = result.language
-                )
+            try {
+                repository.saveResult(result)
+            } catch (e: Throwable) {
+                android.util.Log.e("TypingViewModel", "saveResult error: ${e.message}")
+            }
+            try {
+                if (result.wpm > 0 && authRepository.currentUser != null) {
+                    leaderboardRepository.recordPersonalBest(
+                        wpm = result.wpm,
+                        accuracy = result.accuracy,
+                        language = result.language
+                    )
+                }
+            } catch (e: Throwable) {
+                android.util.Log.e("TypingViewModel", "recordPersonalBest error: ${e.message}")
             }
         }
     }
