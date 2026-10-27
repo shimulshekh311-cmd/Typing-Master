@@ -94,6 +94,7 @@ fun TypingSessionScreen(
     val selectedLanguage by viewModel.selectedLanguage.collectAsStateWithLifecycle()
     val inputLayoutMode by viewModel.inputLayoutMode.collectAsStateWithLifecycle()
     val isPaperMode by viewModel.isPaperMode.collectAsStateWithLifecycle()
+    val targetScrollWpm by viewModel.targetScrollWpm.collectAsStateWithLifecycle()
 
     val virtualKeyboardEnabled by viewModel.virtualKeyboardEnabled.collectAsStateWithLifecycle()
     val hapticEnabled by viewModel.hapticEnabled.collectAsStateWithLifecycle()
@@ -221,6 +222,8 @@ fun TypingSessionScreen(
                 inputLayoutMode = inputLayoutMode,
                 isPaperMode = isPaperMode,
                 isTimerRunning = isTimerRunning,
+                targetScrollWpm = targetScrollWpm,
+                onSetTargetScrollWpm = { viewModel.setTargetScrollWpm(it) },
                 onTogglePaperMode = { viewModel.togglePaperMode() },
                 focusRequester = focusRequester,
                 onValueChange = { viewModel.onUserInputChange(it) },

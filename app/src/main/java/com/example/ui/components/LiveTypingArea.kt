@@ -104,7 +104,9 @@ fun LiveTypingDisplay(
     onBackspace: () -> Unit,
     onToggleLayoutMode: () -> Unit,
     modifier: Modifier = Modifier,
-    isTimerRunning: Boolean = false
+    isTimerRunning: Boolean = false,
+    targetScrollWpm: Int = 0,
+    onSetTargetScrollWpm: (Int) -> Unit = {}
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -160,10 +162,22 @@ fun LiveTypingDisplay(
         } ?: 0
     }
 
-    // LINE-BY-LINE SYNCHRONIZED SCROLLING:
-    // The initial lines visible from the start do not scroll until the user reaches near the bottom of the initial view.
-    // Once that threshold is reached, both the sample box and typing box scroll down by exactly ONE line for each completed line.
-    LaunchedEffect(currentLineIndex, sampleTextLayoutResult, sampleBoxHeightPx) {
+    var showScrollSpeedDialog by remember { mutableStateOf(false) }
+
+    // LINE-BY-LINE SYNCHRONIZED SCROLLING & TARGET WPM PACER SCROLLING:
+    // 1. Typing-based scroll: As soon as the rightmost word of the second-to-last visible line (শেষের লাইনের আগের লাইন)
+    //    is typed, it immediately scrolls down line-by-line so upcoming lines are always clearly in view.
+    // 2. Constant WPM Pacer Scroll: If target WPM > 0 is selected, it steadily scrolls from the beginning at that speed.
+    // 3. Both the sample box and typing box stay 100% in sync.
+    LaunchedEffect(
+        currentLineIndex,
+        currentCursorOffset,
+        sampleTextLayoutResult,
+        sampleBoxHeightPx,
+        targetScrollWpm,
+        elapsedSeconds,
+        isTimerRunning
+    ) {
         val layout = sampleTextLayoutResult ?: return@LaunchedEffect
         if (layout.lineCount <= 1) return@LaunchedEffect
 
@@ -174,12 +188,42 @@ fun LiveTypingDisplay(
             if (isLandscape) 4 else 5
         }
 
+        // Second-to-last visible line threshold (নমুনা বক্সের শেষের লাইনের আগের লাইন)
         val thresholdLine = (visibleLinesCount - 2).coerceAtLeast(1)
-        val targetScrollLine = (currentLineIndex - thresholdLine).coerceAtLeast(0)
-        val targetScrollPx = (targetScrollLine * singleLineHeightPx).coerceIn(0, sampleScrollState.maxValue)
 
-        sampleScrollState.animateScrollTo(targetScrollPx)
-        typedScrollState.animateScrollTo(targetScrollPx.coerceIn(0, typedScrollState.maxValue))
+        // Check if cursor has reached the rightmost word of current line
+        val lineEndOffset = if (currentLineIndex < layout.lineCount) layout.getLineEnd(currentLineIndex) else targetText.length
+        val isNearEndOfLine = currentCursorOffset >= (lineEndOffset - 3).coerceAtLeast(0)
+
+        // Typing-based target scroll line:
+        // As soon as the rightmost word of thresholdLine (or any subsequent line) is reached,
+        // it scrolls down so the upcoming line is revealed immediately.
+        val typingScrollLine = when {
+            currentLineIndex > thresholdLine -> {
+                if (isNearEndOfLine) currentLineIndex - thresholdLine + 1 else currentLineIndex - thresholdLine
+            }
+            currentLineIndex == thresholdLine -> {
+                if (isNearEndOfLine) 1 else 0
+            }
+            else -> 0
+        }.coerceAtLeast(0)
+
+        val typingScrollPx = (typingScrollLine * singleLineHeightPx).coerceIn(0, sampleScrollState.maxValue)
+
+        // Constant speed WPM pacer scroll (if targetScrollWpm > 0 and timer has started)
+        val pacerScrollPx = if (targetScrollWpm > 0 && isTimerRunning && elapsedSeconds > 0 && targetWords.isNotEmpty()) {
+            val totalSecondsForText = (targetWords.size.toFloat() / targetScrollWpm) * 60f
+            val ratio = (elapsedSeconds.toFloat() / totalSecondsForText.coerceAtLeast(10f)).coerceIn(0f, 1f)
+            (ratio * sampleScrollState.maxValue).toInt()
+        } else {
+            0
+        }
+
+        // Whichever is further down takes priority so the user never runs out of visible text
+        val finalTargetScrollPx = maxOf(typingScrollPx, pacerScrollPx).coerceIn(0, sampleScrollState.maxValue)
+
+        sampleScrollState.animateScrollTo(finalTargetScrollPx)
+        typedScrollState.animateScrollTo(finalTargetScrollPx.coerceIn(0, typedScrollState.maxValue))
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -377,46 +421,138 @@ fun LiveTypingDisplay(
                     )
                 }
 
-                // If not in landscape, user can toggle on-screen soft keyboard if needed
-                if (!isLandscape) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Quick Scroll Speed selector badge
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-                        modifier = Modifier.clickable {
-                            useSoftwareKeyboard = !useSoftwareKeyboard
-                            if (!useSoftwareKeyboard) {
-                                keyboardController?.hide()
-                            }
-                        }
+                        color = if (targetScrollWpm > 0) CyanAccent.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        border = BorderStroke(1.dp, if (targetScrollWpm > 0) CyanAccent else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                        modifier = Modifier.clickable { showScrollSpeedDialog = true }
                     ) {
                         Text(
-                            text = if (useSoftwareKeyboard) "সফট কিবোর্ড বন্ধ" else "সফট কিবোর্ড চালু",
+                            text = if (targetScrollWpm == 0) "📜 স্ক্রোল: অটো" else "📜 ${targetScrollWpm} WPM",
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 11.sp,
-                            color = CyanAccent
+                            fontWeight = FontWeight.Bold,
+                            color = if (targetScrollWpm > 0) CyanAccent else MaterialTheme.colorScheme.onSurface
                         )
                     }
-                } else {
-                    // In landscape mode: explicitly show that keyboard is auto-hidden for physical typing
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardHide,
-                            contentDescription = "Keyboard Auto-Hidden",
-                            tint = EmeraldSuccess,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "কিবোর্ড হাইড (এক্সটার্নাল চালু)",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 10.sp,
-                            color = EmeraldSuccess,
-                            fontWeight = FontWeight.Medium
-                        )
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // If not in landscape, user can toggle on-screen soft keyboard if needed
+                    if (!isLandscape) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                            modifier = Modifier.clickable {
+                                useSoftwareKeyboard = !useSoftwareKeyboard
+                                if (!useSoftwareKeyboard) {
+                                    keyboardController?.hide()
+                                }
+                            }
+                        ) {
+                            Text(
+                                text = if (useSoftwareKeyboard) "সফট কিবোর্ড বন্ধ" else "সফট কিবোর্ড চালু",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 11.sp,
+                                color = CyanAccent
+                            )
+                        }
+                    } else {
+                        // In landscape mode: explicitly show that keyboard is auto-hidden for physical typing
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardHide,
+                                contentDescription = "Keyboard Auto-Hidden",
+                                tint = EmeraldSuccess,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "কিবোর্ড হাইড",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                color = EmeraldSuccess,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }
+        }
+
+        // Scroll Speed Selection Dialog
+        if (showScrollSpeedDialog) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showScrollSpeedDialog = false },
+                title = {
+                    Text(
+                        text = "স্ক্রোলিং গতি ও লক্ষ্যমাত্রা",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "প্রথম থেকেই নির্দিষ্ট গতিতে স্ক্রোল করতে লক্ষ্যমাত্রা (WPM) সিলেক্ট করুন অথবা লেখার সাথে সাথে এক লাইন করে স্ক্রোল করতে 'টাইপিং অনুসারী' রাখুন:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        listOf(
+                            0 to "টাইপিং অনুসারী (স্বাভাবিক গতি)",
+                            20 to "২০ WPM (প্রাথমিক লক্ষ্য)",
+                            25 to "২৫ WPM (সরকারি চাকরি লক্ষ্যমাত্রা)",
+                            30 to "৩০ WPM (স্ট্যান্ডার্ড লক্ষ্যমাত্রা)",
+                            35 to "৩৫ WPM (উন্নত গতি)",
+                            40 to "৪০ WPM (দ্রুত পেসার)"
+                        ).forEach { (wpm, label) ->
+                            val isSel = targetScrollWpm == wpm
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        onSetTargetScrollWpm(wpm)
+                                        showScrollSpeedDialog = false
+                                    },
+                                color = if (isSel) CyanAccent.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                border = BorderStroke(1.dp, if (isSel) CyanAccent else Color.Transparent)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSel) CyanAccent else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (isSel) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = CyanAccent,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = { showScrollSpeedDialog = false }) {
+                        Text("ঠিক আছে", color = CyanAccent, fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
         }
 
         // 4. Annotated Target Reading Text (Whole-word formatting to prevent script breaks)
@@ -677,6 +813,9 @@ fun LiveTypingDisplay(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
+                                .onSizeChanged { size ->
+                                    if (size.height > 0) sampleBoxHeightPx = size.height
+                                }
                                 .verticalScroll(sampleScrollState)
                         ) {
                             Text(
@@ -685,9 +824,7 @@ fun LiveTypingDisplay(
                                 lineHeight = sharedLineHeight,
                                 letterSpacing = sharedLetterSpacing,
                                 fontFamily = sharedFontFamily,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .onSizeChanged { size -> sampleBoxHeightPx = size.height },
+                                modifier = Modifier.fillMaxWidth(),
                                 onTextLayout = { layoutResult ->
                                     sampleTextLayoutResult = layoutResult
                                 }
@@ -829,6 +966,9 @@ fun LiveTypingDisplay(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
+                            .onSizeChanged { size ->
+                                if (size.height > 0) sampleBoxHeightPx = size.height
+                            }
                             .verticalScroll(sampleScrollState)
                     ) {
                         Text(
@@ -837,9 +977,7 @@ fun LiveTypingDisplay(
                             lineHeight = sharedLineHeight,
                             letterSpacing = sharedLetterSpacing,
                             fontFamily = sharedFontFamily,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .onSizeChanged { size -> sampleBoxHeightPx = size.height },
+                            modifier = Modifier.fillMaxWidth(),
                             onTextLayout = { layoutResult ->
                                 sampleTextLayoutResult = layoutResult
                             }

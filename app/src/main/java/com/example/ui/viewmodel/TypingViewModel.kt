@@ -158,6 +158,13 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     val hapticEnabled = MutableStateFlow(true)
     val virtualKeyboardEnabled = MutableStateFlow(false)
 
+    // Target Scrolling Mode / Speed (0 = Auto by typing, > 0 = Constant WPM Pacer Scroll)
+    val targetScrollWpm = MutableStateFlow(0)
+
+    fun setTargetScrollWpm(wpm: Int) {
+        targetScrollWpm.value = wpm
+    }
+
     // Scoreboard Filtering
     private val _filterLanguage = MutableStateFlow("ALL")
     val filterLanguage: StateFlow<String> = _filterLanguage.asStateFlow()
@@ -244,7 +251,10 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
-    fun startSpeedTest(durationSecs: Int, difficulty: String = "Medium", chosenTitle: String? = null) {
+    fun startSpeedTest(durationSecs: Int, difficulty: String = "Medium", chosenTitle: String? = null, scrollWpm: Int? = null) {
+        if (scrollWpm != null) {
+            targetScrollWpm.value = scrollWpm
+        }
         val lang = _selectedLanguage.value
         val paragraphs = if (lang == TypingLanguage.BANGLA) {
             LessonDataSource.speedTestParagraphsBangla

@@ -68,6 +68,9 @@ fun SpeedTestScreen(
 ) {
     var selectedDuration by remember { mutableIntStateOf(120) }
     var selectedLanguage by remember { mutableStateOf(TypingLanguage.BANGLA) }
+    val currentScrollWpm by viewModel.targetScrollWpm.collectAsStateWithLifecycle()
+    var selectedScrollWpm by remember { mutableIntStateOf(currentScrollWpm) }
+
     val availableParagraphs = remember(selectedLanguage) {
         if (selectedLanguage == TypingLanguage.BANGLA) {
             LessonDataSource.speedTestParagraphsBangla
@@ -297,6 +300,106 @@ fun SpeedTestScreen(
             }
         }
 
+        // Scrolling Speed / Target WPM Selection (Pacer Mode or Auto-By-Typing)
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "স্ক্রোলিং গতি ও লক্ষ্যমাত্রা (Scroll Speed)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = if (selectedScrollWpm == 0) "টাইপিং অনুসারী" else "$selectedScrollWpm WPM পেসার",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = CyanAccent,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "নির্দিষ্ট লক্ষ্যমাত্রায় প্রথম থেকেই স্ক্রোল করবে অথবা লেখার সাথে সাথে এক লাইন করে স্ক্রোল হবে",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ScrollSpeedOption(
+                    title = "টাইপিং অনুসারী",
+                    subtitle = "স্বাভাবিক গতি",
+                    isSelected = selectedScrollWpm == 0,
+                    onClick = {
+                        selectedScrollWpm = 0
+                        viewModel.setTargetScrollWpm(0)
+                    },
+                    modifier = Modifier.weight(1.3f)
+                )
+                ScrollSpeedOption(
+                    title = "২০ WPM",
+                    subtitle = "প্রাথমিক লক্ষ্য",
+                    isSelected = selectedScrollWpm == 20,
+                    onClick = {
+                        selectedScrollWpm = 20
+                        viewModel.setTargetScrollWpm(20)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                ScrollSpeedOption(
+                    title = "২৫ WPM",
+                    subtitle = "সরকারি চাকরি",
+                    isSelected = selectedScrollWpm == 25,
+                    onClick = {
+                        selectedScrollWpm = 25
+                        viewModel.setTargetScrollWpm(25)
+                    },
+                    modifier = Modifier.weight(1.1f)
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ScrollSpeedOption(
+                    title = "৩০ WPM",
+                    subtitle = "স্ট্যান্ডার্ড",
+                    isSelected = selectedScrollWpm == 30,
+                    onClick = {
+                        selectedScrollWpm = 30
+                        viewModel.setTargetScrollWpm(30)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                ScrollSpeedOption(
+                    title = "৩৫ WPM",
+                    subtitle = "উন্নত গতি",
+                    isSelected = selectedScrollWpm == 35,
+                    onClick = {
+                        selectedScrollWpm = 35
+                        viewModel.setTargetScrollWpm(35)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                ScrollSpeedOption(
+                    title = "৪০ WPM",
+                    subtitle = "দ্রুত পেসার",
+                    isSelected = selectedScrollWpm == 40,
+                    onClick = {
+                        selectedScrollWpm = 40
+                        viewModel.setTargetScrollWpm(40)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
         // Passage Selection Card (Government Job typing test passages + General)
         item {
             Row(
@@ -484,7 +587,7 @@ fun SpeedTestScreen(
             Button(
                 onClick = {
                     viewModel.setSelectedLanguage(selectedLanguage)
-                    viewModel.startSpeedTest(selectedDuration, "Medium", activeParagraphPair.first)
+                    viewModel.startSpeedTest(selectedDuration, "Medium", activeParagraphPair.first, selectedScrollWpm)
                     onStartTest()
                 },
                 modifier = Modifier
@@ -584,6 +687,49 @@ private fun DurationOption(
                 style = MaterialTheme.typography.labelSmall,
                 fontSize = 10.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScrollSpeedOption(
+    title: String,
+    subtitle: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) CyanAccent.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.5.dp,
+            if (isSelected) CyanAccent else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) CyanAccent else MaterialTheme.colorScheme.onSurface,
+                fontSize = 12.sp,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 10.sp,
+                color = if (isSelected) CyanAccent.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
             )
         }
     }
