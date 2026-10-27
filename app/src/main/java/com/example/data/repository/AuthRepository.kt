@@ -8,6 +8,7 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import com.example.data.model.UserProfile
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
@@ -69,11 +70,21 @@ class AuthRepository(
         return try {
             val webClientId = FirebaseHelper.getWebClientId(context)
             val credentialManager = CredentialManager.create(context)
-            val googleIdOption = GetSignInWithGoogleOption.Builder(webClientId)
+
+            // GetGoogleIdOption with filterByAuthorizedAccounts = false ensures that first-time users
+            // are directed to the Google permissions / consent screen ("Continue as...")!
+            val getGoogleIdOption = GetGoogleIdOption.Builder()
+                .setFilterByAuthorizedAccounts(false)
+                .setServerClientId(webClientId)
+                .setAutoSelectEnabled(false)
+                .build()
+
+            val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(webClientId)
                 .build()
 
             val request = GetCredentialRequest.Builder()
-                .addCredentialOption(googleIdOption)
+                .addCredentialOption(getGoogleIdOption)
+                .addCredentialOption(signInWithGoogleOption)
                 .build()
 
             val response = credentialManager.getCredential(
@@ -82,28 +93,50 @@ class AuthRepository(
             )
 
             val credential = response.credential
-            if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                val authCredential = GoogleAuthProvider.getCredential(googleIdTokenCredential.idToken, null)
-                val authResult = auth.signInWithCredential(authCredential).await()
-                val user = authResult.user
-                if (user != null) {
-                    Result.success(user)
-                } else {
-                    Result.failure(Exception("Google Sign-In returned null user"))
+            val idToken = when {
+                credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL -> {
+                    try {
+                        val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                        googleIdTokenCredential.idToken
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to parse GoogleIdTokenCredential", e)
+                        null
+                    }
                 }
+                else -> {
+                    Log.w(TAG, "Received unexpected credential type: ${credential.type}")
+                    null
+                }
+            }
+
+            if (idToken.isNullOrBlank()) {
+                return Result.failure(Exception("গুগল আইডি টোকেন পাওয়া যায়নি। দয়া করে আবার চেষ্টা করুন।"))
+            }
+
+            val authCredential = GoogleAuthProvider.getCredential(idToken, null)
+            val authResult = auth.signInWithCredential(authCredential).await()
+            val user = authResult.user
+            if (user != null) {
+                Result.success(user)
             } else {
-                Result.failure(Exception("Invalid credential type received"))
+                Result.failure(Exception("Firebase ব্যবহারকারী তথ্য পাওয়া যায়নি"))
             }
         } catch (e: GetCredentialCancellationException) {
-            Log.d(TAG, "Google Sign-In cancelled by user")
-            Result.failure(e)
+            Log.d(TAG, "Google Sign-In cancelled: ${e.message}")
+            Result.failure(Exception("গুগল সাইন-ইন বাতিল করা হয়েছে"))
         } catch (e: GetCredentialException) {
-            Log.e(TAG, "CredentialManager error: ${e.message}", e)
-            Result.failure(e)
+            Log.e(TAG, "CredentialManager error: ${e.type} - ${e.message}", e)
+            val msg = when {
+                e.message?.contains("10", ignoreCase = true) == true || e.message?.contains("Developer error", ignoreCase = true) == true ->
+                    "Google Play Services ত্রুটি (Code 10: সাইনিং কি/SHA-1 মিসম্যাচ)। অনুগ্রহ করে নিশ্চিত করুন সঠিক APK ব্যবহার করছেন।"
+                e.message?.contains("16", ignoreCase = true) == true || e.message?.contains("Cannot find a matching", ignoreCase = true) == true ->
+                    "ডিভাইসে কোনো সাইন-ইন যোগ্য গুগল একাউন্ট পাওয়া যায়নি।"
+                else -> "গুগল সাইন-ইন ত্রুটি: ${e.localizedMessage ?: e.message ?: "ব্যর্থ হয়েছে"}"
+            }
+            Result.failure(Exception(msg))
         } catch (e: Throwable) {
             Log.e(TAG, "Unexpected error during Google Sign In: ${e.message}", e)
-            Result.failure(Exception(e.message ?: "Sign-in failed"))
+            Result.failure(Exception(e.localizedMessage ?: e.message ?: "লগইন ব্যর্থ হয়েছে"))
         }
     }
 

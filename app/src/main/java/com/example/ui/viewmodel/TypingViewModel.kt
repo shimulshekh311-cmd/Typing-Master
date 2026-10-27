@@ -84,13 +84,19 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
             val result = authRepository.signInWithGoogle(context)
             isSigningIn.value = false
             result.onSuccess { user ->
-                authMessage.value = "${user.displayName ?: "ব্যবহারকারী"} হিসেবে সফলভাবে লগইন হয়েছে!"
+                val name = user.displayName ?: "ব্যবহারকারী"
+                authMessage.value = "$name হিসেবে সফলভাবে লগইন হয়েছে!"
+                try {
+                    android.widget.Toast.makeText(context, "স্বাগতম, $name! সফলভাবে লগইন হয়েছে।", android.widget.Toast.LENGTH_LONG).show()
+                } catch (_: Throwable) {}
                 // Sync any peak scores from local history
                 syncBestLocalScoreToLeaderboard()
             }.onFailure { err ->
-                if (err !is androidx.credentials.exceptions.GetCredentialCancellationException) {
-                    authMessage.value = "লগইন ব্যর্থ হয়েছে: ${err.localizedMessage ?: "অজানা ত্রুটি"}"
-                }
+                val errorMsg = err.localizedMessage ?: err.message ?: "লগইন সম্পন্ন হয়নি"
+                authMessage.value = errorMsg
+                try {
+                    android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
+                } catch (_: Throwable) {}
             }
         }
     }
