@@ -16,3 +16,6 @@
 local.properties
 .env
 debug.keystore
+
+# Firebase ephemeral logs
+*-debug.log

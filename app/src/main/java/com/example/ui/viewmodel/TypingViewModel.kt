@@ -37,6 +37,8 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     private val repository: TypingRepository
     private val subscriptionManager = SubscriptionManager.getInstance(application)
     private val adManager = AdManager.getInstance(application)
+    private val authRepository = com.example.data.repository.AuthRepository()
+    private val leaderboardRepository = com.example.data.repository.LeaderboardRepository(application)
     private val vibrator = application.getSystemService(Vibrator::class.java)
 
     val subscriptionState: StateFlow<SubscriptionState> = subscriptionManager.subscriptionState
@@ -44,6 +46,80 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     val currentBannerCreative: StateFlow<AdCreative> = adManager.currentBannerCreative
     val showSubscriptionDialog = MutableStateFlow(false)
     val showInterstitialAd = MutableStateFlow(false)
+
+    // Firebase Auth State
+    val currentUser: StateFlow<com.google.firebase.auth.FirebaseUser?> = authRepository.getAuthStateFlow().stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = authRepository.currentUser
+    )
+
+    val isSigningIn = MutableStateFlow(false)
+    val authMessage = MutableStateFlow<String?>(null)
+
+    // Online Leaderboard State
+    val leaderboardFilter = MutableStateFlow("ALL")
+
+    val leaderboardEntries: StateFlow<List<com.example.data.model.LeaderboardEntry>> = combine(
+        currentUser,
+        leaderboardFilter
+    ) { user, filter ->
+        Pair(user, filter)
+    }.flatMapLatest { (user, filter) ->
+        if (user == null) {
+            kotlinx.coroutines.flow.flowOf(emptyList())
+        } else {
+            leaderboardRepository.observeLeaderboard(filter)
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    fun signInWithGoogle(context: android.content.Context) {
+        viewModelScope.launch {
+            isSigningIn.value = true
+            authMessage.value = null
+            val result = authRepository.signInWithGoogle(context)
+            isSigningIn.value = false
+            result.onSuccess { user ->
+                authMessage.value = "${user.displayName ?: "ব্যবহারকারী"} হিসেবে সফলভাবে লগইন হয়েছে!"
+                // Sync any peak scores from local history
+                syncBestLocalScoreToLeaderboard()
+            }.onFailure { err ->
+                if (err !is androidx.credentials.exceptions.GetCredentialCancellationException) {
+                    authMessage.value = "লগইন ব্যর্থ হয়েছে: ${err.localizedMessage ?: "অজানা ত্রুটি"}"
+                }
+            }
+        }
+    }
+
+    fun signOut() {
+        authRepository.signOut()
+        authMessage.value = "লগআউট সম্পন্ন হয়েছে"
+    }
+
+    fun setLeaderboardFilter(filter: String) {
+        leaderboardFilter.value = filter
+    }
+
+    fun syncBestLocalScoreToLeaderboard() {
+        viewModelScope.launch {
+            val user = authRepository.currentUser ?: return@launch
+            val localResults = allResults.value
+            if (localResults.isNotEmpty()) {
+                val peakResult = localResults.maxByOrNull { it.wpm }
+                if (peakResult != null && peakResult.wpm > 0) {
+                    leaderboardRepository.recordPersonalBest(
+                        wpm = peakResult.wpm,
+                        accuracy = peakResult.accuracy,
+                        language = peakResult.language
+                    )
+                }
+            }
+        }
+    }
 
     fun openSubscriptionDialog() {
         showSubscriptionDialog.value = true
@@ -551,9 +627,16 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
             adManager.recordInterstitialImpression()
         }
 
-        // Save into Room Database
+        // Save into Room Database and sync to Firestore Leaderboard
         viewModelScope.launch {
             repository.saveResult(result)
+            if (result.wpm > 0 && authRepository.currentUser != null) {
+                leaderboardRepository.recordPersonalBest(
+                    wpm = result.wpm,
+                    accuracy = result.accuracy,
+                    language = result.language
+                )
+            }
         }
     }
 

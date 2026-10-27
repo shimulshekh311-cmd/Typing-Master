@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "LeaderboardEntry": {
+      "title": "LeaderboardEntry",
+      "description": "Represents the highest typing speed and accuracy recorded by a user",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The unique Firebase Auth UID of the user"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The public display name or username of the user"
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "URL to the user's Google profile avatar"
+        },
+        "highestWpm": {
+          "type": "integer",
+          "description": "Highest recorded Words Per Minute (WPM)"
+        },
+        "highestAccuracy": {
+          "type": "integer",
+          "description": "Typing accuracy percentage (0-100)"
+        },
+        "language": {
+          "type": "string",
+          "enum": ["bangla", "english", "mixed"],
+          "description": "Language in which the record was set"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when this record was submitted via FieldValue.serverTimestamp()"
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "highestWpm",
+        "highestAccuracy",
+        "language",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/leaderboard/{userId}": {
+      "schema": "LeaderboardEntry",
+      "description": "Public leaderboard storing personal best typing records per user"
+    }
+  }
+}
