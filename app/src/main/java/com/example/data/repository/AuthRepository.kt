@@ -101,6 +101,14 @@ class AuthRepository(
                             ?: credential.data.getString("id_token")
                     }
                 }
+                credential is CustomCredential -> {
+                    try {
+                        GoogleIdTokenCredential.createFrom(credential.data).idToken
+                    } catch (_: Throwable) {
+                        credential.data.getString("com.google.android.libraries.identity.googleid.BUNDLE_KEY_ID_TOKEN")
+                            ?: credential.data.getString("id_token")
+                    }
+                }
                 else -> {
                     Log.w(TAG, "Received unexpected credential type: ${credential.type}")
                     null
@@ -126,9 +134,11 @@ class AuthRepository(
             Log.e(TAG, "CredentialManager error: ${e.type} - ${e.message}", e)
             val msg = when {
                 e.message?.contains("10", ignoreCase = true) == true || e.message?.contains("Developer error", ignoreCase = true) == true ->
-                    "Google Play Services ত্রুটি (Code 10: সাইনিং কি/SHA-1 মিসম্যাচ)। অনুগ্রহ করে নিশ্চিত করুন সঠিক APK ব্যবহার করছেন।"
+                    "Google Play Services ত্রুটি (Code 10: সাইনিং কি/SHA-1 মিসম্যাচ)। অনুগ্রহ করে নতুন তৈরি হওয়া সর্বশেষ APK ইনস্টল করুন।"
                 e.message?.contains("16", ignoreCase = true) == true || e.message?.contains("Cannot find a matching", ignoreCase = true) == true ->
-                    "ডিভাইসে কোনো সাইন-ইন যোগ্য গুগল একাউন্ট পাওয়া যায়নি।"
+                    "ডিভাইসে কোনো সাইন-ইন যোগ্য গুগল একাউন্ট পাওয়া যায়নি। অনুগ্রহ করে ফোনে গুগল একাউন্ট যোগ করুন।"
+                e.message?.contains("network", ignoreCase = true) == true ->
+                    "ইন্টারনেট সংযোগ সমস্যা। অনুগ্রহ করে আপনার নেটওয়ার্ক চেক করুন।"
                 else -> "গুগল সাইন-ইন ত্রুটি: ${e.localizedMessage ?: e.message ?: "ব্যর্থ হয়েছে"}"
             }
             Result.failure(Exception(msg))
