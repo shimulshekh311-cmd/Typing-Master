@@ -9,7 +9,6 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import com.example.data.model.UserProfile
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -71,20 +70,18 @@ class AuthRepository(
             val webClientId = FirebaseHelper.getWebClientId(context)
             val credentialManager = CredentialManager.create(context)
 
-            // GetGoogleIdOption with filterByAuthorizedAccounts = false ensures that first-time users
-            // are directed to the Google permissions / consent screen ("Continue as...")!
+            // GetGoogleIdOption with filterByAuthorizedAccounts = false ensures that accounts
+            // can be selected and directed to the consent screen ("Continue as...").
+            // Important: GetSignInWithGoogleOption cannot be combined with other options,
+            // so we use GetGoogleIdOption alone.
             val getGoogleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
                 .setServerClientId(webClientId)
                 .setAutoSelectEnabled(false)
                 .build()
 
-            val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(webClientId)
-                .build()
-
             val request = GetCredentialRequest.Builder()
                 .addCredentialOption(getGoogleIdOption)
-                .addCredentialOption(signInWithGoogleOption)
                 .build()
 
             val response = credentialManager.getCredential(
@@ -99,8 +96,9 @@ class AuthRepository(
                         val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                         googleIdTokenCredential.idToken
                     } catch (e: Exception) {
-                        Log.e(TAG, "Failed to parse GoogleIdTokenCredential", e)
-                        null
+                        Log.e(TAG, "Failed to parse GoogleIdTokenCredential via createFrom", e)
+                        credential.data.getString("com.google.android.libraries.identity.googleid.BUNDLE_KEY_ID_TOKEN")
+                            ?: credential.data.getString("id_token")
                     }
                 }
                 else -> {
