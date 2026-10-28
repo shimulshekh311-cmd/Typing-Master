@@ -150,8 +150,10 @@ class AuthRepository(
                            errorText.contains(": 10", ignoreCase = true) ||
                            errorText.contains("[10]", ignoreCase = true)
             val msg = when {
-                isCode10 ->
-                    "Google Play Services ত্রুটি (Code 10: সাইনিং কি/SHA-1 মিসম্যাচ)। অনুগ্রহ করে নতুন তৈরি হওয়া সর্বশেষ APK ইনস্টল করুন।"
+                isCode10 -> {
+                    val actualSha1 = getInstalledAppCertificateSha1(context)
+                    "গুগল সাইন-ইন কোড ১০ (SHA-1 কী অমিল):\nফোনটির APK-র SHA-1: $actualSha1\nঅফিশিয়াল কী: FD:24:36:11:6E:53:ED:05:2B:F2:0E:80:C3:7E:AF:F9:6A:F9:A7:B3"
+                }
                 errorText.contains("16") || errorText.contains("Cannot find a matching", ignoreCase = true) ->
                     "ডিভাইসে কোনো সাইন-ইন যোগ্য গুগল একাউন্ট পাওয়া যায়নি। অনুগ্রহ করে ফোনে গুগল একাউন্ট যোগ করুন।"
                 errorText.contains("network", ignoreCase = true) ->
@@ -162,6 +164,27 @@ class AuthRepository(
         } catch (e: Throwable) {
             Log.e(TAG, "Unexpected error during Google Sign In: ${e.message}", e)
             Result.failure(Exception(e.localizedMessage ?: e.message ?: "লগইন ব্যর্থ হয়েছে"))
+        }
+    }
+
+    fun getInstalledAppCertificateSha1(context: Context): String {
+        return try {
+            val pm = context.packageManager
+            val signatures = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                val packageInfo = pm.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES)
+                packageInfo.signingInfo?.apkContentsSigners
+            } else {
+                @Suppress("DEPRECATION")
+                val packageInfo = pm.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_SIGNATURES)
+                @Suppress("DEPRECATION")
+                packageInfo.signatures
+            }
+            val cert = signatures?.firstOrNull() ?: return "N/A"
+            val md = java.security.MessageDigest.getInstance("SHA-1")
+            val digest = md.digest(cert.toByteArray())
+            digest.joinToString(":") { "%02X".format(it) }
+        } catch (e: Throwable) {
+            "Error: ${e.message}"
         }
     }
 
