@@ -1,6 +1,8 @@
 package com.example.data.repository
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.util.Log
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -62,13 +64,23 @@ class AuthRepository(
         )
     }
 
+    private fun findActivity(context: Context): Activity? {
+        var current = context
+        while (current is ContextWrapper) {
+            if (current is Activity) return current
+            current = current.baseContext
+        }
+        return null
+    }
+
     suspend fun signInWithGoogle(context: Context): Result<FirebaseUser> {
         val auth = getAuth()
             ?: return Result.failure(IllegalStateException("Firebase Auth সার্ভিস প্রস্তুত করা সম্ভব হয়নি।"))
 
         return try {
-            val webClientId = FirebaseHelper.getWebClientId(context)
-            val credentialManager = CredentialManager.create(context)
+            val targetContext = findActivity(context) ?: context
+            val webClientId = FirebaseHelper.getWebClientId(targetContext)
+            val credentialManager = CredentialManager.create(targetContext)
 
             // GetGoogleIdOption with filterByAuthorizedAccounts = false ensures that accounts
             // can be selected and directed to the consent screen ("Continue as...").
@@ -86,7 +98,7 @@ class AuthRepository(
 
             val response = credentialManager.getCredential(
                 request = request,
-                context = context
+                context = targetContext
             )
 
             val credential = response.credential
@@ -132,14 +144,19 @@ class AuthRepository(
             Result.failure(Exception("গুগল সাইন-ইন বাতিল করা হয়েছে"))
         } catch (e: GetCredentialException) {
             Log.e(TAG, "CredentialManager error: ${e.type} - ${e.message}", e)
+            val errorText = "${e.type} ${e.message ?: ""}"
+            val isCode10 = errorText.contains("DEVELOPER_ERROR", ignoreCase = true) ||
+                           errorText.contains("status code 10", ignoreCase = true) ||
+                           errorText.contains(": 10", ignoreCase = true) ||
+                           errorText.contains("[10]", ignoreCase = true)
             val msg = when {
-                e.message?.contains("10", ignoreCase = true) == true || e.message?.contains("Developer error", ignoreCase = true) == true ->
+                isCode10 ->
                     "Google Play Services ত্রুটি (Code 10: সাইনিং কি/SHA-1 মিসম্যাচ)। অনুগ্রহ করে নতুন তৈরি হওয়া সর্বশেষ APK ইনস্টল করুন।"
-                e.message?.contains("16", ignoreCase = true) == true || e.message?.contains("Cannot find a matching", ignoreCase = true) == true ->
+                errorText.contains("16") || errorText.contains("Cannot find a matching", ignoreCase = true) ->
                     "ডিভাইসে কোনো সাইন-ইন যোগ্য গুগল একাউন্ট পাওয়া যায়নি। অনুগ্রহ করে ফোনে গুগল একাউন্ট যোগ করুন।"
-                e.message?.contains("network", ignoreCase = true) == true ->
+                errorText.contains("network", ignoreCase = true) ->
                     "ইন্টারনেট সংযোগ সমস্যা। অনুগ্রহ করে আপনার নেটওয়ার্ক চেক করুন।"
-                else -> "গুগল সাইন-ইন ত্রুটি: ${e.localizedMessage ?: e.message ?: "ব্যর্থ হয়েছে"}"
+                else -> "গুগল সাইন-ইন ত্রুটি: ${e.localizedMessage ?: e.message ?: e.type}"
             }
             Result.failure(Exception(msg))
         } catch (e: Throwable) {
