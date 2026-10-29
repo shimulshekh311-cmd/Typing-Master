@@ -88,10 +88,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedLanguage by remember { mutableStateOf(TypingLanguage.BANGLA) }
-    var showCustomInput by remember { mutableStateOf(false) }
     var showCommunityDialog by remember { mutableStateOf(false) }
-    var customTitle by remember { mutableStateOf("") }
-    var customText by remember { mutableStateOf("") }
     val context = LocalContext.current
 
     val lessons = if (selectedLanguage == TypingLanguage.BANGLA) {
@@ -296,93 +293,7 @@ fun HomeScreen(
             }
         }
 
-        // Keyboard layout mode selector when Bangla is selected
-        if (selectedLanguage == TypingLanguage.BANGLA) {
-            item {
-                val currentLayout by viewModel.inputLayoutMode.collectAsStateWithLifecycle()
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    ),
-                    border = CardDefaults.outlinedCardBorder()
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = "বাংলা টাইপিং কিবোর্ড মোড:",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable { viewModel.inputLayoutMode.value = InputLayoutMode.BIJOY },
-                                color = if (currentLayout == InputLayoutMode.BIJOY) IndigoPrimary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.5.dp,
-                                    if (currentLayout == InputLayoutMode.BIJOY) IndigoPrimary else Color.Transparent
-                                )
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 10.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "⌨️ বিজয় লেআউট",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (currentLayout == InputLayoutMode.BIJOY) IndigoPrimary else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "এক্সটার্নাল কিবোর্ড ও চাকরির পরীক্ষা",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontSize = 9.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
 
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable { viewModel.inputLayoutMode.value = InputLayoutMode.AVRO_SYSTEM },
-                                color = if (currentLayout == InputLayoutMode.AVRO_SYSTEM) VioletSecondary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.5.dp,
-                                    if (currentLayout == InputLayoutMode.AVRO_SYSTEM) VioletSecondary else Color.Transparent
-                                )
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 10.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "📱 অভ্র / সাধারণ",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (currentLayout == InputLayoutMode.AVRO_SYSTEM) VioletSecondary else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "সরাসরি সফটওয়্যার কিবোর্ড",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontSize = 9.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
 
         // Quick Speed Sprint Launch Card
         item {
@@ -443,83 +354,7 @@ fun HomeScreen(
             }
         }
 
-        // Custom Text Section Toggle
-        item {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showCustomInput = !showCustomInput },
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                border = CardDefaults.outlinedCardBorder()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (showCustomInput) "▲ নিজস্ব লেখা লুকান" else "▼ নিজের পছন্দের টেক্সট লিখে অনুশীলন করুন (Custom Text)",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = CyanAccent
-                    )
-                }
-            }
-        }
 
-        // Custom Text Input form
-        if (showCustomInput) {
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                    ),
-                    border = CardDefaults.outlinedCardBorder()
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        OutlinedTextField(
-                            value = customTitle,
-                            onValueChange = { customTitle = it },
-                            label = { Text("অনুচ্ছেদের শিরোনাম (Title)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedTextField(
-                            value = customText,
-                            onValueChange = { customText = it },
-                            label = { Text("অনুশীলনের টেক্সট পেস্ট বা লিখুন...") },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(100.dp),
-                            maxLines = 5
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Button(
-                            onClick = {
-                                if (customText.isNotBlank()) {
-                                    viewModel.startCustomPractice(customTitle, customText, null)
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("start_custom_text_button"),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = CyanAccent)
-                        ) {
-                            Icon(imageVector = Icons.Default.PlayArrow, contentDescription = "Start")
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("কাস্টম টেক্সটে টাইপিং শুরু করুন", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-        }
 
         // Structured Lessons Header
         item {

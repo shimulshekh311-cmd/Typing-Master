@@ -132,7 +132,7 @@ fun TypingSessionScreen(
                         )
                         Text(
                             text = if (selectedLanguage == TypingLanguage.BANGLA) {
-                                if (inputLayoutMode == com.example.data.model.InputLayoutMode.BIJOY) "বাংলা (বিজয় লেআউট - এক্সটার্নাল কিবোর্ড)" else "বাংলা (অভ্র / সাধারণ কিবোর্ড)"
+                                "বাংলা (বিজয় লেআউট)"
                             } else {
                                 "English Typing Session"
                             },
@@ -230,11 +230,7 @@ fun TypingSessionScreen(
                 onPhysicalKey = { char -> viewModel.handlePhysicalKey(char) },
                 onBackspace = { viewModel.handleBackspace() },
                 onToggleLayoutMode = {
-                    viewModel.inputLayoutMode.value = if (inputLayoutMode == com.example.data.model.InputLayoutMode.BIJOY) {
-                        com.example.data.model.InputLayoutMode.AVRO_SYSTEM
-                    } else {
-                        com.example.data.model.InputLayoutMode.BIJOY
-                    }
+                    // Always Bijoy layout
                 }
             )
 

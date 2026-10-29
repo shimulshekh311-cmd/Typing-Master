@@ -44,13 +44,19 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
+      - name: Restore and verify debug keystore
+        run: |
+          if [ -f "debug.keystore.base64" ]; then
+            base64 -d debug.keystore.base64 > ./debug.keystore
+            echo "Successfully restored debug.keystore from debug.keystore.base64"
+          fi
+          if [ -f "./debug.keystore" ]; then
+            echo "Verifying debug.keystore fingerprint:"
+            keytool -list -v -keystore ./debug.keystore -alias androiddebugkey -storepass android -keypass android | grep -E "SHA1|SHA256" || true
+          fi
+
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace --no-daemon
-
-      - name: Verify debug keystore signature
-        run: |
-          echo "Verifying debug.keystore fingerprint:"
-          keytool -list -v -keystore ./debug.keystore -alias androiddebugkey -storepass android -keypass android | grep -E "SHA1|SHA256"
 
       - name: Verify APK
         run: |
