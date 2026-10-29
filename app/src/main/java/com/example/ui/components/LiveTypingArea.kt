@@ -274,6 +274,29 @@ fun LiveTypingDisplay(
             )
         }
 
+        // Live Animated Speedometer Gauge & Streak Multiplier HUD
+        val currentStreak = remember(userInput, targetText) {
+            var streak = 0
+            val minLen = minOf(userInput.length, targetText.length)
+            for (i in (minLen - 1) downTo 0) {
+                if (userInput[i] == targetText[i]) {
+                    streak++
+                } else {
+                    break
+                }
+            }
+            streak
+        }
+
+        if (!isLandscape && !isPaperMode) {
+            SpeedometerGaugeView(
+                liveWpm = liveWpm,
+                liveAccuracy = liveAccuracy,
+                streakCount = currentStreak,
+                modifier = Modifier.padding(bottom = 10.dp)
+            )
+        }
+
         // Timer Notification Banner before first keystroke
         AnimatedVisibility(visible = !isTimerRunning && elapsedSeconds == 0) {
             Surface(

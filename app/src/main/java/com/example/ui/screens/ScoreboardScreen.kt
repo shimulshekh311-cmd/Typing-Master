@@ -424,9 +424,30 @@ fun ScoreboardScreen(
                         }
                     }
                 } else {
-                    itemsIndexed(leaderboardEntries, key = { _, item -> item.id }) { index, entry ->
+                    // Top 3 Podium Champions
+                    item {
+                        com.example.ui.components.LeaderboardPodiumView(
+                            entries = leaderboardEntries.take(3)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+
+                    val remainingEntries = if (leaderboardEntries.size > 3) leaderboardEntries.drop(3) else emptyList()
+                    if (remainingEntries.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = "অন্যান্য প্রতিযোগীবৃন্দ",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                            )
+                        }
+                    }
+
+                    itemsIndexed(remainingEntries, key = { _, item -> item.id }) { index, entry ->
                         LeaderboardItemCard(
-                            rank = index + 1,
+                            rank = index + 4,
                             entry = entry,
                             isCurrentUser = entry.userId == currentUser?.uid
                         )

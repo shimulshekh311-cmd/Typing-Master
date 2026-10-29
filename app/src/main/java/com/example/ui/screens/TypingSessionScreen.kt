@@ -297,8 +297,9 @@ fun TypingSessionScreen(
         }
     }
 
-    // Completion Results Dialog
+    // Completion Results Dialog & Confetti Celebration
     if (completedResult != null) {
+        com.example.ui.components.ConfettiCelebration()
         val res = completedResult!!
         val rank = when {
             res.wpm >= 50 && res.accuracy >= 95f -> "S"
