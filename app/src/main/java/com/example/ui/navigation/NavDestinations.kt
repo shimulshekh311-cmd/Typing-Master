@@ -14,9 +14,10 @@ enum class MainDestination(
     val titleBn: String,
     val icon: ImageVector
 ) {
-    LEARN("learn", "Lessons", "পাঠ ও শিক্ষা", Icons.Default.School),
+    LEARN("learn", "Lessons", "পাঠ", Icons.Default.School),
     SPEED_TEST("speed_test", "Speed Test", "গতি পরীক্ষা", Icons.Default.Speed),
-    SCOREBOARD("scoreboard", "Scoreboard", "স্কোরবোর্ড", Icons.Default.Leaderboard),
-    MONTHLY_REPORT("monthly_report", "Monthly Report", "মাসিক রিপোর্ট", Icons.Default.BarChart)
+    LEADERBOARD("leaderboard", "Leaderboard", "লিডারবোর্ড", Icons.Default.Leaderboard),
+    MONTHLY_REPORT("monthly_report", "Report", "রিপোর্ট", Icons.Default.BarChart),
+    ACCOUNT("account", "Account", "একাউন্ট", Icons.Default.AccountCircle)
 }
 

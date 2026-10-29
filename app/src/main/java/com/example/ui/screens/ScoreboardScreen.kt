@@ -70,6 +70,7 @@ import com.example.ui.viewmodel.TypingViewModel
 @Composable
 fun ScoreboardScreen(
     viewModel: TypingViewModel,
+    onNavigateToAccount: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -112,13 +113,13 @@ fun ScoreboardScreen(
             ) {
                 Column {
                     Text(
-                        text = "স্কোরবোর্ড ও লিডারবোর্ড",
+                        text = "অনলাইন লিডারবোর্ড",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.ExtraBold,
                         color = CyanAccent
                     )
                     Text(
-                        text = "গুগল একাউন্ট দিয়ে সর্বোচ্চ গতির অনলাইন র‍্যাংকিং",
+                        text = "টাইপিং স্পিড র‍্যাংকিং ও পার্সোনাল রেকর্ড হিস্ট্রি",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -139,15 +140,54 @@ fun ScoreboardScreen(
             }
         }
 
-        // Google Sign-In / Account Card
-        item {
-            GoogleSignInCard(
-                currentUser = currentUser,
-                isSigningIn = isSigningIn,
-                authMessage = authMessage,
-                onSignIn = { viewModel.signInWithGoogle(context) },
-                onSignOut = { viewModel.signOut() }
-            )
+        // Account Sign-in hint if guest
+        if (currentUser == null) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onNavigateToAccount() }
+                        .testTag("leaderboard_signin_hint_card"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = IndigoPrimary.copy(alpha = 0.12f)
+                    ),
+                    border = CardDefaults.outlinedCardBorder()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Account",
+                                tint = CyanAccent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "লিডারবোর্ডে নিজের নাম যুক্ত করতে 'একাউন্ট' ট্যাবে সাইন-ইন করুন",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Text(
+                            text = "একাউন্ট",
+                            color = CyanAccent,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
         }
 
         // Ad Banner

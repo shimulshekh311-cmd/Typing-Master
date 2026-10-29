@@ -423,9 +423,9 @@ fun TypingSessionScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = CyanAccent),
                     modifier = Modifier.testTag("result_dialog_view_scoreboard_button")
                 ) {
-                    Icon(imageVector = Icons.Default.Leaderboard, contentDescription = "Scoreboard", modifier = Modifier.size(16.dp))
+                    Icon(imageVector = Icons.Default.Leaderboard, contentDescription = "Leaderboard", modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("স্কোরবোর্ডে দেখুন", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                    Text("লিডারবোর্ডে দেখুন", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {

@@ -35,8 +35,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.ui.navigation.MainDestination
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.example.ui.screens.AccountScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.MonthlyReportScreen
+import com.example.ui.screens.OnboardingWelcomeScreen
 import com.example.ui.screens.ScoreboardScreen
 import com.example.ui.screens.SpeedTestScreen
 import com.example.ui.screens.TypingSessionScreen
@@ -85,10 +89,21 @@ enum class ScreenState {
 
 @Composable
 fun MainAppContent(viewModel: TypingViewModel) {
+    var showOnboarding by rememberSaveable { mutableStateOf(true) }
     var screenState by remember { mutableStateOf(ScreenState.TABS) }
     var currentDestination by remember { mutableStateOf(MainDestination.LEARN) }
 
-    if (screenState == ScreenState.ACTIVE_SESSION) {
+    if (showOnboarding) {
+        BackHandler {
+            showOnboarding = false
+        }
+        OnboardingWelcomeScreen(
+            viewModel = viewModel,
+            onDismissOrContinue = {
+                showOnboarding = false
+            }
+        )
+    } else if (screenState == ScreenState.ACTIVE_SESSION) {
         TypingSessionScreen(
             viewModel = viewModel,
             onBack = {
@@ -96,7 +111,7 @@ fun MainAppContent(viewModel: TypingViewModel) {
             },
             onNavigateToScoreboard = {
                 screenState = ScreenState.TABS
-                currentDestination = MainDestination.SCOREBOARD
+                currentDestination = MainDestination.LEADERBOARD
             }
         )
     } else {
@@ -167,11 +182,24 @@ fun MainAppContent(viewModel: TypingViewModel) {
                             }
                         )
                     }
-                    MainDestination.SCOREBOARD -> {
-                        ScoreboardScreen(viewModel = viewModel)
+                    MainDestination.LEADERBOARD -> {
+                        ScoreboardScreen(
+                            viewModel = viewModel,
+                            onNavigateToAccount = {
+                                currentDestination = MainDestination.ACCOUNT
+                            }
+                        )
                     }
                     MainDestination.MONTHLY_REPORT -> {
                         MonthlyReportScreen(viewModel = viewModel)
+                    }
+                    MainDestination.ACCOUNT -> {
+                        AccountScreen(
+                            viewModel = viewModel,
+                            onShowOnboarding = {
+                                showOnboarding = true
+                            }
+                        )
                     }
                 }
             }
