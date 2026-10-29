@@ -1,15 +1,11 @@
 package com.example.ui.screens
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,27 +14,26 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,7 +55,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.IndigoPrimary
-import com.example.ui.theme.VioletSecondary
 import com.example.ui.viewmodel.TypingViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -70,14 +64,13 @@ data class OnboardingSlideItem(
     val subtitle: String,
     val description: String,
     val badge: String,
-    val imageResId: Int?
+    val imageResId: Int
 )
 
 @Composable
 fun OnboardingWelcomeScreen(
     viewModel: TypingViewModel,
     onDismissOrContinue: () -> Unit,
-    canDismiss: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -90,45 +83,45 @@ fun OnboardingWelcomeScreen(
         OnboardingSlideItem(
             title = "বাংলা ও ইংরেজি টাইপিং শিক্ষা",
             subtitle = "সহজে ও দ্রুত টাইপিং শিখুন",
-            description = "স্বাভাবিক গতি বাড়ানোর জন্য বর্ণমালা, যুক্তবর্ণ, শব্দ ও পূর্ণ বাক্যের ধাপে ধাপে পাঠ এবং ভিজ্যুয়াল কি-বোর্ড গাইড।",
+            description = "বর্ণমালা, যুক্তবর্ণ, শব্দ ও পূর্ণ বাক্যের ধাপে ধাপে ইন্টারঅ্যাকটিভ পাঠ এবং স্ক্রিন কি-বোর্ড গাইড।",
             badge = "ইন্টারেক্টিভ লেসন",
             imageResId = R.drawable.img_slide_typing
         ),
         OnboardingSlideItem(
             title = "লাইভ টাইপিং স্পিড টেস্ট",
             subtitle = "WPM ও নির্ভুলতা পরিমাপ করুন",
-            description = "প্রতি মিনিটের শব্দ গতি (WPM), নির্ভুলতা হার (Accuracy) এবং রিয়েল-টাইম ভুল ডিটেকশন দিয়ে নিজের স্পিড বাড়ান।",
+            description = "প্রতি মিনিটের শব্দ গতি (WPM), অ্যাকুরেসি হার এবং লাইভ ভুল সংশোধন দিয়ে টাইপিং স্পিড দ্রুত বাড়ান।",
             badge = "রিয়েল-টাইম মেট্রিক্স",
             imageResId = R.drawable.img_slide_speedtest
         ),
         OnboardingSlideItem(
             title = "অনলাইন গ্লোবাল লিডারবোর্ড",
             subtitle = "সবার সাথে প্রতিযোগিতা করুন",
-            description = "গুগল একাউন্টে লগইন করে নিজের সেরা টাইপিং রেকর্ড জাতীয় অনলাইন লিডারবোর্ডে যুক্ত করুন এবং র‍্যাঙ্কিং দেখুন।",
+            description = "গুগল একাউন্টে লগইন করে নিজের সেরা টাইপিং রেকর্ড জাতীয় অনলাইন লিডারবোর্ডে যুক্ত করুন ও র‍্যাঙ্কিং দেখুন।",
             badge = "লাইভ লিডারবোর্ড",
             imageResId = R.drawable.img_slide_leaderboard
         ),
         OnboardingSlideItem(
-            title = "বিস্তারিত অগ্রগতি ও রিপোর্ট",
+            title = "ব্যক্তিগত ও মাসিক প্রগ্রেস রিপোর্ট",
             subtitle = "আপনার টাইপিং ট্র্যাক করুন",
-            description = "প্রতিটি টেস্টের ফলাফল, দৈনিক অনুশীলন সময় এবং বিগত দিনগুলোর অগ্রগতির রিপোর্ট এক জায়গায় পর্যবেক্ষণ করুন।",
-            badge = "পারফরম্যান্স ট্র্যাক",
+            description = "ক্লাউড অটো-সিঙ্ক সহ প্রতিটি টেস্টের ফলাফল ও বিগত দিনগুলোর অগ্রগতির গ্রাফিক্যাল রিপোর্ট।",
+            badge = "ক্লাউড ব্যাকআপ ও রিপোর্ট",
             imageResId = R.drawable.img_slide_speedtest
         )
     )
 
     val pagerState = rememberPagerState(pageCount = { slides.size })
 
-    // Auto-advance slides every 4.5 seconds
+    // Auto-advance slides every 4 seconds
     LaunchedEffect(pagerState.currentPage) {
-        delay(4500)
+        delay(4000)
         coroutineScope.launch {
             val nextPage = (pagerState.currentPage + 1) % slides.size
-            pagerState.animateScrollToPage(nextPage, animationSpec = tween(600))
+            pagerState.animateScrollToPage(nextPage, animationSpec = tween(650))
         }
     }
 
-    // When signed in successfully, dismiss automatically
+    // When signed in successfully, dismiss onboarding screen immediately
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             onDismissOrContinue()
@@ -138,146 +131,72 @@ fun OnboardingWelcomeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF0F172A),
-                        Color(0xFF0B0F19),
-                        Color(0xFF07090E)
-                    )
-                )
-            )
+            .background(Color(0xFF07090E))
             .testTag("onboarding_welcome_screen")
     ) {
-        Column(
+        // Full screen Carousel Slider - image occupies almost the entire screen
+        HorizontalPager(
+            state = pagerState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top Bar with Skip / Close
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(CyanAccent.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "TM",
-                            color = CyanAccent,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 12.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Typing Master",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                .testTag("onboarding_feature_pager")
+        ) { page ->
+            val slide = slides[page]
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Feature Picture taking virtually full screen
+                Image(
+                    painter = painterResource(id = slide.imageResId),
+                    contentDescription = slide.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
 
-                if (canDismiss) {
-                    TextButton(
-                        onClick = onDismissOrContinue,
-                        modifier = Modifier.testTag("onboarding_skip_button")
-                    ) {
-                        Text(
-                            text = "বাদ দিন",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Main Carousel Slider
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .testTag("onboarding_feature_pager")
-            ) { page ->
-                val slide = slides[page]
-                Column(
+                // Smooth dark gradient overlay from top to bottom
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    // Feature Image Banner Card
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(230.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                    ) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            if (slide.imageResId != null) {
-                                Image(
-                                    painter = painterResource(id = slide.imageResId),
-                                    contentDescription = slide.title,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
-
-                            // Dark Gradient Overlay for text contrast
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color.Transparent,
-                                                Color.Black.copy(alpha = 0.75f)
-                                            )
-                                        )
-                                    )
+                        .background(
+                            Brush.verticalGradient(
+                                0.0f to Color.Black.copy(alpha = 0.5f),
+                                0.25f to Color.Transparent,
+                                0.55f to Color(0xFF07090E).copy(alpha = 0.85f),
+                                0.82f to Color(0xFF07090E),
+                                1.0f to Color(0xFF07090E)
                             )
+                        )
+                )
 
-                            // Feature Badge
-                            Surface(
-                                modifier = Modifier
-                                    .padding(14.dp)
-                                    .align(Alignment.TopStart),
-                                shape = RoundedCornerShape(12.dp),
-                                color = CyanAccent.copy(alpha = 0.9f)
-                            ) {
-                                Text(
-                                    text = slide.badge,
-                                    color = Color.Black,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
+                // Feature details anchored above bottom action panel
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 140.dp), // Space reserved for indicators and Log in with Google button
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Feature Badge
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = CyanAccent.copy(alpha = 0.95f),
+                        shadowElevation = 4.dp
+                    ) {
+                        Text(
+                            text = slide.badge,
+                            color = Color.Black,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                        )
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     // Title
                     Text(
                         text = slide.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Black,
                         color = Color.White,
                         textAlign = TextAlign.Center
                     )
@@ -287,30 +206,73 @@ fun OnboardingWelcomeScreen(
                     // Subtitle
                     Text(
                         text = slide.subtitle,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
                         color = CyanAccent,
                         textAlign = TextAlign.Center
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Description
                     Text(
                         text = slide.description,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF94A3B8),
+                        color = Color(0xFFCBD5E1),
                         textAlign = TextAlign.Center,
-                        lineHeight = 21.sp,
-                        modifier = Modifier.padding(horizontal = 12.dp)
+                        lineHeight = 22.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp)
                     )
                 }
             }
+        }
 
+        // Top App Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.65f),
+                border = CardDefaults.outlinedCardBorder()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Keyboard,
+                        contentDescription = "Logo",
+                        tint = CyanAccent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Typing Master",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+
+        // Bottom Controls: Pager Dots + Log in with Google Button (No Skip, No Guest)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             // Pager Indicators
             Row(
-                modifier = Modifier
-                    .padding(vertical = 12.dp),
+                modifier = Modifier.padding(bottom = 16.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -320,14 +282,31 @@ fun OnboardingWelcomeScreen(
                         modifier = Modifier
                             .padding(horizontal = 4.dp)
                             .height(8.dp)
-                            .width(if (isSelected) 24.dp else 8.dp)
+                            .width(if (isSelected) 28.dp else 8.dp)
                             .clip(CircleShape)
                             .background(if (isSelected) CyanAccent else Color(0xFF475569))
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // Auth Message or Error Notice if any
+            AnimatedVisibility(visible = !authMessage.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFF1E293B),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp)
+                ) {
+                    Text(
+                        text = authMessage.orEmpty(),
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+            }
 
             // Prominent "Log in with Google" Button
             Button(
@@ -337,22 +316,22 @@ fun OnboardingWelcomeScreen(
                 enabled = !isSigningIn,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .height(54.dp)
                     .testTag("onboarding_google_login_button"),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color.White,
                     contentColor = Color.Black
                 ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
             ) {
                 if (isSigningIn) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(24.dp),
                         color = IndigoPrimary,
                         strokeWidth = 2.5.dp
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = "গুগল একাউন্টে যুক্ত হচ্ছে...",
                         color = Color.Black,
@@ -360,9 +339,9 @@ fun OnboardingWelcomeScreen(
                         fontSize = 15.sp
                     )
                 } else {
-                    // Google G Icon
+                    // Google "G" Symbol
                     Surface(
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(26.dp),
                         shape = CircleShape,
                         color = Color.Transparent
                     ) {
@@ -371,7 +350,7 @@ fun OnboardingWelcomeScreen(
                                 text = "G",
                                 color = Color(0xFF4285F4),
                                 fontWeight = FontWeight.Black,
-                                fontSize = 18.sp
+                                fontSize = 20.sp
                             )
                         }
                     }
@@ -379,53 +358,13 @@ fun OnboardingWelcomeScreen(
                     Text(
                         text = "Log in with Google",
                         color = Color(0xFF1F2937),
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.ExtraBold,
                         fontSize = 16.sp
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Guest Continue Button
-            Button(
-                onClick = onDismissOrContinue,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .testTag("onboarding_guest_continue_button"),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1E293B),
-                    contentColor = CyanAccent
-                )
-            ) {
-                Text(
-                    text = "গেস্ট হিসেবে সরাসরি শুরু করুন",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-
-            // Auth Message or Notice if present
-            if (!authMessage.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = authMessage ?: "",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CyanAccent,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }

@@ -39,6 +39,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     private val adManager = AdManager.getInstance(application)
     private val authRepository = com.example.data.repository.AuthRepository(application)
     private val leaderboardRepository = com.example.data.repository.LeaderboardRepository(application)
+    private val userDataSyncRepository = com.example.data.repository.UserDataSyncRepository(application)
     private val vibrator = application.getSystemService(Vibrator::class.java)
 
     val subscriptionState: StateFlow<SubscriptionState> = subscriptionManager.subscriptionState
@@ -102,8 +103,13 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun signOut() {
-        authRepository.signOut()
-        authMessage.value = "লগআউট সম্পন্ন হয়েছে"
+        viewModelScope.launch {
+            authRepository.signOut()
+            authMessage.value = "লগআউট সম্পন্ন হয়েছে"
+            try {
+                repository.clearAll()
+            } catch (_: Throwable) {}
+        }
     }
 
     fun setLeaderboardFilter(filter: String) {
@@ -180,6 +186,15 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     init {
         val db = TypingDatabase.getDatabase(application)
         repository = TypingRepository(db.typingResultDao())
+
+        viewModelScope.launch {
+            currentUser.collect { user ->
+                if (user != null) {
+                    userDataSyncRepository.syncCloudToLocal(user.uid)
+                    syncBestLocalScoreToLeaderboard()
+                }
+            }
+        }
     }
 
     // App Navigation & Selected Language
@@ -637,7 +652,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
             adManager.recordInterstitialImpression()
         }
 
-        // Save into Room Database and sync to Firestore Leaderboard
+        // Save into Room Database and sync to Firestore Leaderboard & User Storage
         viewModelScope.launch {
             try {
                 repository.saveResult(result)
@@ -645,15 +660,19 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
                 android.util.Log.e("TypingViewModel", "saveResult error: ${e.message}")
             }
             try {
-                if (result.wpm > 0 && authRepository.currentUser != null) {
-                    leaderboardRepository.recordPersonalBest(
-                        wpm = result.wpm,
-                        accuracy = result.accuracy,
-                        language = result.language
-                    )
+                val user = authRepository.currentUser
+                if (user != null) {
+                    userDataSyncRepository.uploadResult(user.uid, result)
+                    if (result.wpm > 0) {
+                        leaderboardRepository.recordPersonalBest(
+                            wpm = result.wpm,
+                            accuracy = result.accuracy,
+                            language = result.language
+                        )
+                    }
                 }
             } catch (e: Throwable) {
-                android.util.Log.e("TypingViewModel", "recordPersonalBest error: ${e.message}")
+                android.util.Log.e("TypingViewModel", "sync cloud error: ${e.message}")
             }
         }
     }

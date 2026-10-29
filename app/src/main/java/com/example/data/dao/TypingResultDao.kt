@@ -28,6 +28,9 @@ interface TypingResultDao {
     @Query("SELECT COUNT(*) FROM typing_results")
     suspend fun getCount(): Int
 
+    @Query("SELECT timestamp FROM typing_results")
+    suspend fun getAllTimestamps(): List<Long>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertResult(result: TypingResult): Long
 

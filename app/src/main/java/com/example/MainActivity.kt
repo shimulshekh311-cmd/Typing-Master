@@ -35,27 +35,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.ui.navigation.MainDestination
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.screens.AccountScreen
 import com.example.ui.screens.HomeScreen
-import com.example.ui.screens.MonthlyReportScreen
 import com.example.ui.screens.OnboardingWelcomeScreen
+import com.example.ui.screens.PersonalReportScreen
 import com.example.ui.screens.ScoreboardScreen
 import com.example.ui.screens.SpeedTestScreen
 import com.example.ui.screens.TypingSessionScreen
 import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.MyApplicationTheme
-import com.example.ui.theme.VioletSecondary
 import com.example.ui.viewmodel.TypingViewModel
 import com.google.android.gms.ads.MobileAds
 
@@ -99,18 +90,17 @@ enum class ScreenState {
 
 @Composable
 fun MainAppContent(viewModel: TypingViewModel) {
-    var showOnboarding by rememberSaveable { mutableStateOf(true) }
+    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     var screenState by remember { mutableStateOf(ScreenState.TABS) }
     var currentDestination by remember { mutableStateOf(MainDestination.LEARN) }
 
-    if (showOnboarding) {
-        BackHandler {
-            showOnboarding = false
-        }
+    // If user is not logged in, enforce the onboarding login screen with full screen slider
+    // Once logged in (currentUser != null), the login screen is never shown again!
+    if (currentUser == null) {
         OnboardingWelcomeScreen(
             viewModel = viewModel,
             onDismissOrContinue = {
-                showOnboarding = false
+                // Triggered automatically when currentUser becomes non-null
             }
         )
     } else if (screenState == ScreenState.ACTIVE_SESSION) {
@@ -130,67 +120,42 @@ fun MainAppContent(viewModel: TypingViewModel) {
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing),
             bottomBar = {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .testTag("main_bottom_nav"),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-                    shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(
-                        1.dp,
-                        Brush.horizontalGradient(
-                            listOf(
-                                CyanAccent.copy(alpha = 0.35f),
-                                VioletSecondary.copy(alpha = 0.2f),
-                                CyanAccent.copy(alpha = 0.35f)
-                            )
-                        )
-                    ),
-                    tonalElevation = 10.dp
+                NavigationBar(
+                    modifier = Modifier.testTag("main_bottom_nav"),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 8.dp
                 ) {
-                    NavigationBar(
-                        containerColor = Color.Transparent,
-                        tonalElevation = 0.dp
-                    ) {
-                        MainDestination.entries.forEach { destination ->
-                            val isSelected = currentDestination == destination
-                            NavigationBarItem(
-                                selected = isSelected,
-                                onClick = { currentDestination = destination },
-                                icon = {
-                                    Icon(
-                                        imageVector = destination.icon,
-                                        contentDescription = destination.titleEn
-                                    )
-                                },
-                                label = {
-                                    Text(
-                                        text = destination.titleBn,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                },
-                                colors = NavigationBarItemDefaults.colors(
-                                    indicatorColor = CyanAccent.copy(alpha = 0.22f),
-                                    selectedIconColor = CyanAccent,
-                                    selectedTextColor = CyanAccent,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                ),
-                                modifier = Modifier.testTag("nav_item_${destination.route}")
-                            )
-                        }
+                    MainDestination.entries.forEach { destination ->
+                        val isSelected = currentDestination == destination
+                        NavigationBarItem(
+                            selected = isSelected,
+                            onClick = { currentDestination = destination },
+                            icon = {
+                                Icon(
+                                    imageVector = destination.icon,
+                                    contentDescription = destination.titleEn
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = destination.titleBn,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = CyanAccent.copy(alpha = 0.2f),
+                                selectedIconColor = CyanAccent,
+                                selectedTextColor = CyanAccent
+                            ),
+                            modifier = Modifier.testTag("nav_item_${destination.route}")
+                        )
                     }
                 }
             }
         ) { innerPadding ->
             AnimatedContent(
                 targetState = currentDestination,
-                transitionSpec = {
-                    (fadeIn(animationSpec = tween(280)) + slideInHorizontally { width -> width / 6 }) togetherWith
-                    fadeOut(animationSpec = tween(200))
-                },
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
@@ -226,15 +191,10 @@ fun MainAppContent(viewModel: TypingViewModel) {
                         )
                     }
                     MainDestination.MONTHLY_REPORT -> {
-                        MonthlyReportScreen(viewModel = viewModel)
+                        PersonalReportScreen(viewModel = viewModel)
                     }
                     MainDestination.ACCOUNT -> {
-                        AccountScreen(
-                            viewModel = viewModel,
-                            onShowOnboarding = {
-                                showOnboarding = true
-                            }
-                        )
+                        AccountScreen(viewModel = viewModel)
                     }
                 }
             }

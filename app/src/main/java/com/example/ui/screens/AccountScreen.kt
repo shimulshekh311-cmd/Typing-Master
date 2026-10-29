@@ -2,9 +2,6 @@ package com.example.ui.screens
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,25 +18,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,42 +36,45 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import com.example.ui.components.AdBannerView
 import com.example.ui.components.GoogleSignInCard
+import com.example.ui.components.MonthlyAccuracyChart
+import com.example.ui.components.MonthlySpeedChart
+import com.example.ui.components.MonthlySummaryCards
 import com.example.ui.theme.CyanAccent
-import com.example.ui.theme.EmeraldSuccess
 import com.example.ui.theme.IndigoPrimary
-import com.example.ui.theme.RoseError
 import com.example.ui.theme.VioletSecondary
 import com.example.ui.viewmodel.TypingViewModel
+import java.text.DateFormatSymbols
+import java.util.Locale
 
 @Composable
 fun AccountScreen(
     viewModel: TypingViewModel,
-    onShowOnboarding: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isSigningIn by viewModel.isSigningIn.collectAsStateWithLifecycle()
     val authMessage by viewModel.authMessage.collectAsStateWithLifecycle()
-    val allResults by viewModel.allResults.collectAsStateWithLifecycle()
 
-    val totalTests = allResults.size
-    val highestWpm = allResults.maxOfOrNull { it.wpm } ?: 0
-    val avgAccuracy = if (allResults.isNotEmpty()) {
-        allResults.map { it.accuracy }.average().toFloat()
-    } else 0f
+    val reportYear by viewModel.reportYear.collectAsStateWithLifecycle()
+    val reportMonth by viewModel.reportMonth.collectAsStateWithLifecycle()
+    val summary by viewModel.monthlyReport.collectAsStateWithLifecycle()
+
+    val monthNamesBn = listOf(
+        "জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন",
+        "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"
+    )
+    val monthNameBn = monthNamesBn.getOrElse(reportMonth - 1) { "" }
+    val monthNameEn = DateFormatSymbols(Locale.ENGLISH).months.getOrElse(reportMonth - 1) { "" }
 
     val facebookUrl = "https://www.facebook.com/brandifycreative311/"
     val whatsAppUrl = "https://wa.me/8801635586380"
@@ -116,7 +108,7 @@ fun AccountScreen(
                         color = CyanAccent
                     )
                     Text(
-                        text = "আপনার গুগল একাউন্ট ও টাইপিং প্রোফাইল তথ্য",
+                        text = "আপনার গুগল একাউন্ট ও মাসিক অগ্রগতির বিস্তারিত রিপোর্ট",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -150,83 +142,92 @@ fun AccountScreen(
             )
         }
 
-        // Performance Highlights Card
+        // Month Selector Header Card for Monthly Report
         item {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("account_stats_summary_card"),
+                    .testTag("month_selector_header"),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                 ),
                 border = CardDefaults.outlinedCardBorder()
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    IconButton(
+                        onClick = { viewModel.changeReportMonth(-1) },
+                        modifier = Modifier.testTag("prev_month_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Speed,
-                            contentDescription = "Stats",
-                            tint = CyanAccent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            text = "আপনার টাইপিং রেকর্ড সামারি",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Previous Month"
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = null,
+                                tint = CyanAccent,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "$monthNameBn $reportYear",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = CyanAccent
+                            )
+                        }
+                        Text(
+                            text = "মাসিক রিপোর্ট ($monthNameEn $reportYear)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    IconButton(
+                        onClick = { viewModel.changeReportMonth(1) },
+                        modifier = Modifier.testTag("next_month_button")
                     ) {
-                        // Max WPM
-                        StatBox(
-                            label = "সর্বোচ্চ গতি",
-                            value = "$highestWpm",
-                            unit = "WPM",
-                            accentColor = CyanAccent,
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        // Average Accuracy
-                        StatBox(
-                            label = "গড় নির্ভুলতা",
-                            value = "%.1f".format(avgAccuracy),
-                            unit = "%",
-                            accentColor = EmeraldSuccess,
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        // Total Tests
-                        StatBox(
-                            label = "মোট টেস্ট",
-                            value = "$totalTests",
-                            unit = "বার",
-                            accentColor = VioletSecondary,
-                            modifier = Modifier.weight(1f)
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Next Month"
                         )
                     }
                 }
             }
         }
 
-        // Connect with Brandify Creative (Social Channels requested by user)
+        // Monthly Summary Metric Cards
+        item {
+            MonthlySummaryCards(summary = summary)
+        }
+
+        // 1. Monthly Speed Graph (Canvas Line/Area Chart)
+        item {
+            MonthlySpeedChart(dailyStats = summary.dailyStats)
+        }
+
+        // 2. Monthly Accuracy Graph (Canvas Bar Chart)
+        item {
+            MonthlyAccuracyChart(dailyStats = summary.dailyStats)
+        }
+
+        // Ad Banner
+        item {
+            AdBannerView(viewModel = viewModel)
+        }
+
+        // Connect with Brandify Creative (Social Channels placed at bottom as requested)
         item {
             Text(
                 text = "যোগাযোগ ও সোশ্যাল মিডিয়া",
@@ -371,67 +372,6 @@ fun AccountScreen(
             }
         }
 
-        // View App Features Carousel
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable { onShowOnboarding() }
-                    .testTag("account_view_slides_button"),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = CyanAccent.copy(alpha = 0.08f)
-                ),
-                border = CardDefaults.outlinedCardBorder()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = "Features",
-                            tint = CyanAccent,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Column {
-                            Text(
-                                text = "অ্যাপের সকল ফিচার স্লাইড দেখুন",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "ফিচার প্রিভিউ ও স্ক্রিনশট স্লাইডার পুনরায় দেখুন",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = "দেখুন",
-                        color = CyanAccent,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                }
-            }
-        }
-
-        // Ad Banner
-        item {
-            AdBannerView(viewModel = viewModel)
-        }
-
         // App Information Footer
         item {
             Column(
@@ -452,51 +392,6 @@ fun AccountScreen(
                     color = MaterialTheme.colorScheme.outline
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatBox(
-    label: String,
-    value: String,
-    unit: String,
-    accentColor: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-        border = CardDefaults.outlinedCardBorder()
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Black,
-                    color = accentColor
-                )
-                Text(
-                    text = unit,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(bottom = 2.dp)
-                )
             }
         }
     }

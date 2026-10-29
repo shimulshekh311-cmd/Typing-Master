@@ -1,6 +1,5 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,36 +14,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,18 +39,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.model.LeaderboardEntry
 import com.example.ui.components.AdBannerView
-import com.example.ui.components.GoogleSignInCard
 import com.example.ui.components.LeaderboardItemCard
-import com.example.ui.components.ScoreboardSummaryHero
-import com.example.ui.components.TypingResultItemCard
+import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.EmeraldSuccess
 import com.example.ui.theme.IndigoPrimary
-import com.example.ui.theme.RoseError
 import com.example.ui.theme.VioletSecondary
 import com.example.ui.viewmodel.TypingViewModel
 
@@ -76,26 +62,8 @@ fun ScoreboardScreen(
     val context = LocalContext.current
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isSigningIn by viewModel.isSigningIn.collectAsStateWithLifecycle()
-    val authMessage by viewModel.authMessage.collectAsStateWithLifecycle()
-
     val leaderboardEntries by viewModel.leaderboardEntries.collectAsStateWithLifecycle()
     val leaderboardFilter by viewModel.leaderboardFilter.collectAsStateWithLifecycle()
-
-    val allResults by viewModel.allResults.collectAsStateWithLifecycle()
-    val filteredResults by viewModel.filteredResults.collectAsStateWithLifecycle()
-    val currentFilter by viewModel.filterLanguage.collectAsStateWithLifecycle()
-
-    var selectedMainTab by remember { mutableIntStateOf(0) } // 0 = Online Leaderboard, 1 = Personal History
-    var showClearDialog by remember { mutableStateOf(false) }
-
-    // Aggregate stats for personal history
-    val englishResults = allResults.filter { it.language == "ENGLISH" }
-    val banglaResults = allResults.filter { it.language == "BANGLA" }
-
-    val peakWpmEn = englishResults.maxOfOrNull { it.wpm } ?: 0
-    val bestAccuracyEn = englishResults.maxOfOrNull { it.accuracy } ?: 0f
-    val peakWpmBn = banglaResults.maxOfOrNull { it.wpm } ?: 0
-    val totalTests = allResults.size
 
     LazyColumn(
         modifier = modifier
@@ -119,73 +87,68 @@ fun ScoreboardScreen(
                         color = CyanAccent
                     )
                     Text(
-                        text = "টাইপিং স্পিড র‍্যাংকিং ও পার্সোনাল রেকর্ড হিস্ট্রি",
+                        text = "শীর্ষ টাইপিস্টদের জাতীয় গ্লোবাল র‍্যাংকিং",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                if (selectedMainTab == 1 && allResults.isNotEmpty()) {
-                    IconButton(
-                        onClick = { showClearDialog = true },
-                        modifier = Modifier.testTag("clear_history_button")
-                    ) {
+                Surface(
+                    shape = CircleShape,
+                    color = AmberWarning.copy(alpha = 0.15f),
+                    modifier = Modifier.size(42.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Default.DeleteSweep,
-                            contentDescription = "Clear History",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = "Trophy",
+                            tint = AmberWarning,
+                            modifier = Modifier.size(26.dp)
                         )
                     }
                 }
             }
         }
 
-        // Account Sign-in hint if guest
-        if (currentUser == null) {
-            item {
-                Card(
+        // Language Filter Chips
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("leaderboard_filter_card"),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                ),
+                border = CardDefaults.outlinedCardBorder()
+            ) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onNavigateToAccount() }
-                        .testTag("leaderboard_signin_hint_card"),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = IndigoPrimary.copy(alpha = 0.12f)
-                    ),
-                    border = CardDefaults.outlinedCardBorder()
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Account",
-                                tint = CyanAccent,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = "লিডারবোর্ডে নিজের নাম যুক্ত করতে 'একাউন্ট' ট্যাবে সাইন-ইন করুন",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Text(
-                            text = "একাউন্ট",
-                            color = CyanAccent,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
+                    FilterTabButton(
+                        text = "সব ভাষা",
+                        isSelected = leaderboardFilter == "ALL",
+                        onClick = { viewModel.setLeaderboardFilter("ALL") },
+                        color = IndigoPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterTabButton(
+                        text = "বাংলা",
+                        isSelected = leaderboardFilter == "BANGLA",
+                        onClick = { viewModel.setLeaderboardFilter("BANGLA") },
+                        color = VioletSecondary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterTabButton(
+                        text = "English",
+                        isSelected = leaderboardFilter == "ENGLISH",
+                        onClick = { viewModel.setLeaderboardFilter("ENGLISH") },
+                        color = CyanAccent,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
@@ -195,315 +158,66 @@ fun ScoreboardScreen(
             AdBannerView(viewModel = viewModel)
         }
 
-        // Main Tab Selection (Online Leaderboard vs Personal History)
-        item {
-            TabRow(
-                selectedTabIndex = selectedMainTab,
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                contentColor = CyanAccent,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[selectedMainTab]),
-                        color = CyanAccent,
-                        height = 3.dp
-                    )
-                },
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .testTag("scoreboard_main_tabs")
-            ) {
-                Tab(
-                    selected = selectedMainTab == 0,
-                    onClick = { selectedMainTab = 0 },
-                    text = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.EmojiEvents,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "অনলাইন লিডারবোর্ড",
-                                fontWeight = if (selectedMainTab == 0) FontWeight.Bold else FontWeight.Medium
-                            )
-                        }
-                    },
-                    modifier = Modifier.testTag("tab_online_leaderboard")
-                )
-
-                Tab(
-                    selected = selectedMainTab == 1,
-                    onClick = { selectedMainTab = 1 },
-                    text = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.History,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "ব্যক্তিগত টেস্ট ইতিহাস",
-                                fontWeight = if (selectedMainTab == 1) FontWeight.Bold else FontWeight.Medium
-                            )
-                        }
-                    },
-                    modifier = Modifier.testTag("tab_personal_history")
-                )
-            }
-        }
-
-        // Content for Tab 0: ONLINE LEADERBOARD
-        if (selectedMainTab == 0) {
-            // Language Sub-filters for Leaderboard
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                    ),
-                    border = CardDefaults.outlinedCardBorder()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        FilterTabButton(
-                            text = "সব ভাষা",
-                            isSelected = leaderboardFilter == "ALL",
-                            onClick = { viewModel.setLeaderboardFilter("ALL") },
-                            color = IndigoPrimary,
-                            modifier = Modifier.weight(1f)
-                        )
-                        FilterTabButton(
-                            text = "বাংলা",
-                            isSelected = leaderboardFilter == "BANGLA",
-                            onClick = { viewModel.setLeaderboardFilter("BANGLA") },
-                            color = VioletSecondary,
-                            modifier = Modifier.weight(1f)
-                        )
-                        FilterTabButton(
-                            text = "English",
-                            isSelected = leaderboardFilter == "ENGLISH",
-                            onClick = { viewModel.setLeaderboardFilter("ENGLISH") },
-                            color = CyanAccent,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-
-            if (currentUser == null) {
-                // Notice to Sign In to see full online leaderboard
-                item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp)
-                            .testTag("leaderboard_login_prompt"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                        ),
-                        border = CardDefaults.outlinedCardBorder()
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.EmojiEvents,
-                                contentDescription = "Trophy",
-                                tint = CyanAccent,
-                                modifier = Modifier.size(44.dp)
-                            )
-                            Text(
-                                text = "গুগল সাইন-ইন আবশ্যক",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "অন্যান্য ব্যবহারকারীরা সর্বোচ্চ কত গতি রেকর্ড করেছে তা দেখতে এবং আপনার নিজের রেকর্ড যুক্ত করতে ফোনের গুগল একাউন্ট দিয়ে লগইন করুন।",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Button(
-                                onClick = { viewModel.signInWithGoogle(context) },
-                                colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.testTag("leaderboard_prompt_sign_in_button")
-                            ) {
-                                Text("গুগল দিয়ে লগইন করুন", color = Color.White, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Authenticated Leaderboard List Header
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "শীর্ষ টাইপিস্টদের তালিকা (Top Typists)",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "${leaderboardEntries.size} জন",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = CyanAccent,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                if (leaderboardEntries.isEmpty()) {
-                    item {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 20.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(24.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.EmojiEvents,
-                                    contentDescription = "Empty",
-                                    tint = CyanAccent.copy(alpha = 0.5f),
-                                    modifier = Modifier.size(46.dp)
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "এখনও কোনো রেকর্ড যুক্ত হয়নি",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "একটি টাইপিং টেস্ট সম্পন্ন করুন অথবা আপনার পূর্বের রেকর্ড সিঙ্ক করতে উপরে বাটন চাপুন।",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Button(
-                                    onClick = { viewModel.syncBestLocalScoreToLeaderboard() },
-                                    colors = ButtonDefaults.buttonColors(containerColor = CyanAccent),
-                                    shape = RoundedCornerShape(10.dp)
-                                ) {
-                                    Text("আমার সেরা স্কোর সিঙ্ক করুন", color = Color.White, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // Top 3 Podium Champions
-                    item {
-                        com.example.ui.components.LeaderboardPodiumView(
-                            entries = leaderboardEntries.take(3)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                    }
-
-                    val remainingEntries = if (leaderboardEntries.size > 3) leaderboardEntries.drop(3) else emptyList()
-                    if (remainingEntries.isNotEmpty()) {
-                        item {
-                            Text(
-                                text = "অন্যান্য প্রতিযোগীবৃন্দ",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                            )
-                        }
-                    }
-
-                    itemsIndexed(remainingEntries, key = { _, item -> item.id }) { index, entry ->
-                        LeaderboardItemCard(
-                            rank = index + 4,
-                            entry = entry,
-                            isCurrentUser = entry.userId == currentUser?.uid
-                        )
-                    }
-                }
-            }
-        } else {
-            // Content for Tab 1: PERSONAL TEST HISTORY
-            item {
-                ScoreboardSummaryHero(
-                    peakWpmEn = peakWpmEn,
-                    bestAccuracyEn = bestAccuracyEn,
-                    peakWpmBn = peakWpmBn,
-                    totalSessions = totalTests
-                )
-            }
-
+        // Guest / Unauthenticated Prompt
+        if (currentUser == null) {
             item {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("scoreboard_filter_card"),
-                    shape = RoundedCornerShape(14.dp),
+                        .padding(vertical = 12.dp)
+                        .testTag("leaderboard_login_prompt"),
+                    shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                     ),
                     border = CardDefaults.outlinedCardBorder()
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        FilterTabButton(
-                            text = "সব (${allResults.size})",
-                            isSelected = currentFilter == "ALL",
-                            onClick = { viewModel.setFilterLanguage("ALL") },
-                            color = IndigoPrimary,
-                            modifier = Modifier.weight(1f)
+                        Icon(
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = "Trophy",
+                            tint = CyanAccent,
+                            modifier = Modifier.size(44.dp)
                         )
-                        FilterTabButton(
-                            text = "English (${englishResults.size})",
-                            isSelected = currentFilter == "ENGLISH",
-                            onClick = { viewModel.setFilterLanguage("ENGLISH") },
-                            color = CyanAccent,
-                            modifier = Modifier.weight(1f)
+                        Text(
+                            text = "গুগল সাইন-ইন আবশ্যক",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
-                        FilterTabButton(
-                            text = "বাংলা (${banglaResults.size})",
-                            isSelected = currentFilter == "BANGLA",
-                            onClick = { viewModel.setFilterLanguage("BANGLA") },
-                            color = VioletSecondary,
-                            modifier = Modifier.weight(1f)
+                        Text(
+                            text = "অন্যান্য ব্যবহারকারীরা সর্বোচ্চ কত গতি রেকর্ড করেছে তা দেখতে এবং আপনার নিজের রেকর্ড যুক্ত করতে ফোনের গুগল একাউন্ট দিয়ে লগইন করুন।",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Button(
+                            onClick = { viewModel.signInWithGoogle(context) },
+                            colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.testTag("leaderboard_prompt_sign_in_button")
+                        ) {
+                            Text("গুগল দিয়ে লগইন করুন", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
                     }
+                }
+            }
+        } else {
+            // Signed In View: Podium & List
+            if (leaderboardEntries.size >= 3) {
+                item {
+                    LeaderboardPodium(
+                        first = leaderboardEntries[0],
+                        second = leaderboardEntries[1],
+                        third = leaderboardEntries[2]
+                    )
                 }
             }
 
@@ -511,24 +225,25 @@ fun ScoreboardScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 2.dp),
+                        .padding(top = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "ব্যক্তিগত পরীক্ষার ইতিহাস",
+                        text = "জাতীয় র‍্যাঙ্কিং তালিকা",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "${filteredResults.size} টি ফলাফল",
+                        text = "${leaderboardEntries.size} জন",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            if (filteredResults.isEmpty()) {
+            if (leaderboardEntries.isEmpty()) {
                 item {
                     Card(
                         modifier = Modifier
@@ -543,34 +258,45 @@ fun ScoreboardScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Leaderboard,
                                 contentDescription = "Empty",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.size(48.dp)
+                                tint = CyanAccent.copy(alpha = 0.6f),
+                                modifier = Modifier.size(44.dp)
                             )
-                            Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = "কোনো রেকর্ড পাওয়া যায়নি",
+                                text = "এখনো কোনো রেকর্ড যুক্ত হয়নি",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "অনুশীলন বা গতি পরীক্ষা সম্পন্ন করলে এখানে স্কোর দেখতে পাবেন।",
+                                text = "স্পিড টেস্ট সম্পন্ন করুন বা আপনার সেরা রেকর্ড ক্লাউডে সিঙ্ক করুন!",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp)
+                                textAlign = TextAlign.Center
                             )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Button(
+                                onClick = { viewModel.syncBestLocalScoreToLeaderboard() },
+                                colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("আমার সেরা স্কোর সিঙ্ক করুন", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
             } else {
-                items(filteredResults, key = { it.id }) { result ->
-                    TypingResultItemCard(
-                        result = result,
-                        onDelete = { viewModel.deleteResult(result.id) }
+                itemsIndexed(leaderboardEntries, key = { _, item -> item.id }) { index, entry ->
+                    LeaderboardItemCard(
+                        rank = index + 1,
+                        entry = entry,
+                        isCurrentUser = entry.userId == currentUser?.uid
                     )
                 }
             }
@@ -580,35 +306,126 @@ fun ScoreboardScreen(
             Spacer(modifier = Modifier.height(20.dp))
         }
     }
+}
 
-    // Confirmation Dialog for Clearing All
-    if (showClearDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearDialog = false },
-            title = { Text("সব ব্যক্তিগত স্কোর মুছে ফেলবেন?") },
-            text = { Text("আপনার ডিভাইসে সংরক্ষিত সকল পরীক্ষার ইতিহাস মুছে যাবে।") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.clearAllResults()
-                        showClearDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = RoseError)
-                ) {
-                    Text("মুছে ফেলুন", color = Color.White)
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showClearDialog = false }) {
-                    Text("বাতিল")
-                }
+@Composable
+private fun LeaderboardPodium(
+    first: LeaderboardEntry,
+    second: LeaderboardEntry,
+    third: LeaderboardEntry
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("leaderboard_podium_card"),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        ),
+        border = CardDefaults.outlinedCardBorder()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "শীর্ষ ৩ টাইপার",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = AmberWarning
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                // 2nd Place
+                PodiumColumn(
+                    entry = second,
+                    rank = 2,
+                    pedestalHeight = 70.dp,
+                    color = Color(0xFFC0C0C0)
+                )
+
+                // 1st Place
+                PodiumColumn(
+                    entry = first,
+                    rank = 1,
+                    pedestalHeight = 96.dp,
+                    color = AmberWarning
+                )
+
+                // 3rd Place
+                PodiumColumn(
+                    entry = third,
+                    rank = 3,
+                    pedestalHeight = 54.dp,
+                    color = Color(0xFFCD7F32)
+                )
             }
-        )
+        }
     }
 }
 
 @Composable
-private fun FilterTabButton(
+private fun PodiumColumn(
+    entry: LeaderboardEntry,
+    rank: Int,
+    pedestalHeight: androidx.compose.ui.unit.Dp,
+    color: Color
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(88.dp)
+    ) {
+        // Name
+        Text(
+            text = entry.displayName,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
+
+        // WPM
+        Text(
+            text = "${entry.highestWpm} WPM",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.ExtraBold,
+            color = CyanAccent
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Pedestal Box
+        Box(
+            modifier = Modifier
+                .width(76.dp)
+                .height(pedestalHeight)
+                .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
+                .background(color.copy(alpha = 0.25f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "#$rank",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 18.sp,
+                    color = color
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FilterTabButton(
     text: String,
     isSelected: Boolean,
     onClick: () -> Unit,
