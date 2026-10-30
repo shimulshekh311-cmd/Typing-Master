@@ -94,10 +94,8 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
                 val name = user.displayName ?: "ব্যবহারকারী"
                 authMessage.value = "$name হিসেবে সফলভাবে লগইন হয়েছে!"
                 try {
-                    android.widget.Toast.makeText(context, "স্বাগতম, $name! সফলভাবে লগইন হয়েছে।", android.widget.Toast.LENGTH_LONG).show()
+                    android.widget.Toast.makeText(context, "স্বাগতম, $name! সফলভাবে লগইন হয়েছে।", android.widget.Toast.LENGTH_SHORT).show()
                 } catch (_: Throwable) {}
-                // Sync any peak scores from local history
-                syncBestLocalScoreToLeaderboard()
             }.onFailure { err ->
                 val errorMsg = err.localizedMessage ?: err.message ?: "লগইন সম্পন্ন হয়নি"
                 authMessage.value = errorMsg
@@ -193,7 +191,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         val db = TypingDatabase.getDatabase(application)
         repository = TypingRepository(db.typingResultDao())
 
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             currentUser.collect { user ->
                 if (user != null) {
                     userDataSyncRepository.syncCloudToLocal(user.uid)

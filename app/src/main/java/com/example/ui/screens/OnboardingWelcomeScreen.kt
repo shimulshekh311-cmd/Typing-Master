@@ -339,21 +339,12 @@ fun OnboardingWelcomeScreen(
                         fontSize = 15.sp
                     )
                 } else {
-                    // Google "G" Symbol
-                    Surface(
-                        modifier = Modifier.size(26.dp),
-                        shape = CircleShape,
-                        color = Color.Transparent
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "G",
-                                color = Color(0xFF4285F4),
-                                fontWeight = FontWeight.Black,
-                                fontSize = 20.sp
-                            )
-                        }
-                    }
+                    // Official 4-color Google Logo
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_google_logo),
+                        contentDescription = "Google Logo",
+                        modifier = Modifier.size(24.dp)
+                    )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = "Log in with Google",

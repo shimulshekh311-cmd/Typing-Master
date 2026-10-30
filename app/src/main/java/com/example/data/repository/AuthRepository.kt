@@ -73,6 +73,10 @@ class AuthRepository(
         return null
     }
 
+    private val credentialManager: CredentialManager by lazy {
+        CredentialManager.create(context.applicationContext)
+    }
+
     suspend fun signInWithGoogle(context: Context): Result<FirebaseUser> {
         val auth = getAuth()
             ?: return Result.failure(IllegalStateException("Firebase Auth সার্ভিস প্রস্তুত করা সম্ভব হয়নি।"))
@@ -80,16 +84,14 @@ class AuthRepository(
         return try {
             val targetContext = findActivity(context) ?: context
             val webClientId = FirebaseHelper.getWebClientId(targetContext)
-            val credentialManager = CredentialManager.create(targetContext)
 
-            // GetGoogleIdOption with filterByAuthorizedAccounts = false ensures that accounts
-            // can be selected and directed to the consent screen ("Continue as...").
-            // Important: GetSignInWithGoogleOption cannot be combined with other options,
-            // so we use GetGoogleIdOption alone.
+            // GetGoogleIdOption with autoSelectEnabled = true allows instant 1-tap/auto-selection
+            // when an account is available on the phone, while filterByAuthorizedAccounts = false
+            // ensures any Google account on the device can be chosen.
             val getGoogleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
                 .setServerClientId(webClientId)
-                .setAutoSelectEnabled(false)
+                .setAutoSelectEnabled(true)
                 .build()
 
             val request = GetCredentialRequest.Builder()
@@ -131,9 +133,12 @@ class AuthRepository(
                 return Result.failure(Exception("গুগল আইডি টোকেন পাওয়া যায়নি। দয়া করে আবার চেষ্টা করুন।"))
             }
 
-            val authCredential = GoogleAuthProvider.getCredential(idToken, null)
-            val authResult = auth.signInWithCredential(authCredential).await()
-            val user = authResult.user
+            val user = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val authCredential = GoogleAuthProvider.getCredential(idToken, null)
+                val authResult = auth.signInWithCredential(authCredential).await()
+                authResult.user
+            }
+
             if (user != null) {
                 Result.success(user)
             } else {

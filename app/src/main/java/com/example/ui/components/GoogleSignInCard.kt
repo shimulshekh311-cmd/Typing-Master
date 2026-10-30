@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -7,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.res.painterResource
+import com.example.R
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -118,42 +121,36 @@ fun GoogleSignInCard(
                         .testTag("google_sign_in_button"),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = IndigoPrimary
-                    )
+                        containerColor = Color.White,
+                        contentColor = Color(0xFF1F2937)
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                 ) {
                     if (isSigningIn) {
                         CircularProgressIndicator(
-                            color = Color.White,
+                            color = IndigoPrimary,
                             modifier = Modifier.size(22.dp),
                             strokeWidth = 2.5.dp
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "গুগল একাউন্টে যুক্ত হচ্ছে...",
-                            color = Color.White,
+                            color = Color(0xFF1F2937),
                             fontWeight = FontWeight.Bold
                         )
                     } else {
-                        // Google "G" representation
-                        Surface(
-                            modifier = Modifier.size(22.dp),
-                            shape = CircleShape,
-                            color = Color.White
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "G",
-                                    color = Color(0xFF4285F4),
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 14.sp
-                                )
-                            }
-                        }
+                        // Official 4-color Google Logo
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_google_logo),
+                            contentDescription = "Google Logo",
+                            modifier = Modifier.size(22.dp)
+                        )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "ফোনের Google একাউন্ট দিয়ে সাইন-ইন",
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            text = "Log in with Google",
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF1F2937),
+                            fontSize = 15.sp
                         )
                     }
                 }

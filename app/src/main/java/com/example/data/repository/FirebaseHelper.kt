@@ -64,23 +64,35 @@ object FirebaseHelper {
         }
     }
 
+    @Volatile
+    private var cachedDatabaseId: String? = null
+
+    @Volatile
+    private var cachedWebClientId: String? = null
+
     fun getDatabaseId(context: Context): String {
+        cachedDatabaseId?.let { return it }
         val resId = context.resources.getIdentifier("firestore_database_id", "string", context.packageName)
-        if (resId != 0) {
-            val id = context.getString(resId)
-            if (id.isNotBlank()) return id
-        }
-        return DATABASE_ID
+        val id = if (resId != 0) {
+            val found = context.getString(resId)
+            if (found.isNotBlank()) found else null
+        } else null
+        val finalId = id ?: DATABASE_ID
+        cachedDatabaseId = finalId
+        return finalId
     }
 
     fun getWebClientId(context: Context): String {
+        cachedWebClientId?.let { return it }
         val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
-        if (resId != 0) {
-            val id = context.getString(resId)
-            if (id.isNotBlank()) return id
-        }
+        val id = if (resId != 0) {
+            val found = context.getString(resId)
+            if (found.isNotBlank()) found else null
+        } else null
         val prefix = "743583859776-2d5pp5cgius2lt5gaseacrg76o5h5vkj"
         val domain = "apps" + ".google" + "usercontent.com"
-        return "$prefix.$domain"
+        val finalId = id ?: "$prefix.$domain"
+        cachedWebClientId = finalId
+        return finalId
     }
 }
