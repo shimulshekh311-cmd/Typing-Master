@@ -44,6 +44,7 @@ import com.example.ui.screens.OnboardingWelcomeScreen
 import com.example.ui.screens.PersonalReportScreen
 import com.example.ui.screens.ScoreboardScreen
 import com.example.ui.screens.SpeedTestScreen
+import com.example.ui.screens.SplashScreen
 import com.example.ui.screens.TypingSessionScreen
 import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.MyApplicationTheme
@@ -105,9 +106,18 @@ fun MainAppContent(viewModel: TypingViewModel) {
         }
     }
 
-    // If user is not logged in, enforce the onboarding login screen with full screen slider
-    // Once logged in (currentUser != null), the login screen is never shown again!
-    if (currentUser == null) {
+    var isSplashVisible by rememberSaveable { mutableStateOf(true) }
+
+    // If splash is visible, show animated colorful splash screen
+    if (isSplashVisible) {
+        SplashScreen(
+            onSplashFinished = {
+                isSplashVisible = false
+            }
+        )
+    } else if (currentUser == null) {
+        // If user is not logged in, enforce the onboarding login screen with full screen slider
+        // Once logged in (currentUser != null), the login screen is never shown again!
         OnboardingWelcomeScreen(
             viewModel = viewModel,
             onDismissOrContinue = {

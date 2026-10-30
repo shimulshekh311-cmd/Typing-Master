@@ -1,7 +1,10 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,10 +99,6 @@ fun SpeedTestScreen(
     var customTextTitle by remember { mutableStateOf("") }
     var customTextContent by remember { mutableStateOf("") }
 
-    // Dropdown expanded states
-    var isDurationDropdownExpanded by remember { mutableStateOf(false) }
-    var isScrollDropdownExpanded by remember { mutableStateOf(false) }
-
     val availableParagraphs = remember(selectedLanguage) {
         if (selectedLanguage == TypingLanguage.BANGLA) {
             LessonDataSource.speedTestParagraphsBangla
@@ -126,19 +125,12 @@ fun SpeedTestScreen(
 
     // Scroll speed options: 20 to 40 WPM
     val scrollSpeedOptions = listOf(
-        0 to "টাইপিং অনুসারী",
         20 to "২০ WPM",
         25 to "২৫ WPM",
         30 to "৩০ WPM",
         35 to "৩৫ WPM",
         40 to "৪০ WPM"
     )
-
-    val currentDurationLabel = durationOptions.find { it.first == selectedDuration }?.second
-        ?: "${selectedDuration / 60} মিনিট"
-
-    val currentScrollLabel = scrollSpeedOptions.find { it.first == selectedScrollWpm }?.second
-        ?: if (selectedScrollWpm == 0) "টাইপিং অনুসারী" else "$selectedScrollWpm WPM"
 
     LazyColumn(
         modifier = modifier
@@ -271,161 +263,108 @@ fun SpeedTestScreen(
             }
         }
 
-        // 3. Dropdown Menu for Duration Selection (Left: সময় নির্ধারণ, Right: Dropdown)
+        // 3. Selectable Chips for Duration Selection (Left: সময় নির্ধারণ :, Right: ২ মিনিট - ৫ মিনিট - ১০ মিনিট)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "সময় নির্ধারণ",
+                    text = "সময় নির্ধারণ :",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(end = 8.dp)
                 )
 
-                Box {
-                    Card(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { isDurationDropdownExpanded = true }
-                            .testTag("duration_dropdown_trigger"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                        ),
-                        border = CardDefaults.outlinedCardBorder()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    durationOptions.forEach { (seconds, label) ->
+                        val isSelected = selectedDuration == seconds
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { selectedDuration = seconds }
+                                .testTag("duration_${seconds}s"),
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) CyanAccent.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            border = BorderStroke(
+                                1.5.dp,
+                                if (isSelected) CyanAccent else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                            )
                         ) {
-                            Text(
-                                text = currentDurationLabel,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = CyanAccent
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Icon(
-                                imageVector = if (isDurationDropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
-                                contentDescription = "Dropdown",
-                                tint = CyanAccent
-                            )
-                        }
-                    }
-
-                    DropdownMenu(
-                        expanded = isDurationDropdownExpanded,
-                        onDismissRequest = { isDurationDropdownExpanded = false },
-                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                    ) {
-                        durationOptions.forEach { (seconds, label) ->
-                            val isSelected = selectedDuration == seconds
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = label,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) CyanAccent else MaterialTheme.colorScheme.onSurface
-                                    )
-                                },
-                                onClick = {
-                                    selectedDuration = seconds
-                                    isDurationDropdownExpanded = false
-                                },
-                                trailingIcon = {
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = "Selected",
-                                            tint = CyanAccent,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-                            )
+                            Box(
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) CyanAccent else MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 13.sp,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        // 4. Dropdown Menu for Scrolling Target Speed (Left: স্ক্রোলিং গতি, Right: Dropdown)
+        // 4. Scrolling Target Speed (Single line: fixed "স্ক্রোলিং গতি :", followed by horizontally scrollable WPM options)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "স্ক্রোলিং গতি",
+                    text = "স্ক্রোলিং গতি :",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(end = 8.dp)
                 )
 
-                Box {
-                    Card(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { isScrollDropdownExpanded = true }
-                            .testTag("scroll_dropdown_trigger"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                        ),
-                        border = CardDefaults.outlinedCardBorder()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = currentScrollLabel,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = CyanAccent
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Icon(
-                                imageVector = if (isScrollDropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
-                                contentDescription = "Dropdown",
-                                tint = CyanAccent
-                            )
-                        }
-                    }
-
-                    DropdownMenu(
-                        expanded = isScrollDropdownExpanded,
-                        onDismissRequest = { isScrollDropdownExpanded = false },
-                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                    ) {
-                        scrollSpeedOptions.forEach { (wpm, label) ->
-                            val isSelected = selectedScrollWpm == wpm
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = label,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) CyanAccent else MaterialTheme.colorScheme.onSurface
-                                    )
-                                },
-                                onClick = {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    scrollSpeedOptions.forEach { (wpm, label) ->
+                        val isSelected = selectedScrollWpm == wpm
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
                                     selectedScrollWpm = wpm
                                     viewModel.setTargetScrollWpm(wpm)
-                                    isScrollDropdownExpanded = false
-                                },
-                                trailingIcon = {
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = "Selected",
-                                            tint = CyanAccent,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
                                 }
+                                .testTag("scroll_wpm_$wpm"),
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) CyanAccent.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            border = BorderStroke(
+                                1.5.dp,
+                                if (isSelected) CyanAccent else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                             )
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) CyanAccent else MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 13.sp,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }

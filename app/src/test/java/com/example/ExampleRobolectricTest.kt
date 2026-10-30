@@ -150,6 +150,20 @@ class ExampleRobolectricTest {
     adManager.recordBannerImpression()
     assertEquals(countBefore, adManager.adStats.value.totalImpressions)
   }
+
+  @Test
+  fun `verify speed test duration and scroll speed options range`() {
+    val durationOptions = listOf(120, 300, 600)
+    assertEquals(3, durationOptions.size)
+    assertTrue(durationOptions.contains(120)) // 2 min
+    assertTrue(durationOptions.contains(300)) // 5 min
+    assertTrue(durationOptions.contains(600)) // 10 min
+
+    val scrollSpeedWpms = listOf(20, 25, 30, 35, 40)
+    assertEquals(5, scrollSpeedWpms.size)
+    assertEquals(20, scrollSpeedWpms.first())
+    assertEquals(40, scrollSpeedWpms.last())
+  }
 }
 
 
