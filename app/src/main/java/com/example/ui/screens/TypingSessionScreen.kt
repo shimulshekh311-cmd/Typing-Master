@@ -153,20 +153,6 @@ fun TypingSessionScreen(
                     }
                 },
                 actions = {
-                    // Toggle Paper Copy Mode / Split Screen Mode
-                    IconButton(
-                        onClick = {
-                            viewModel.togglePaperMode()
-                        },
-                        modifier = Modifier.testTag("toggle_paper_mode_action_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Article,
-                            contentDescription = "Toggle Paper Mode",
-                            tint = if (isPaperMode) CyanAccent else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
                     // Toggle Virtual Keyboard
                     IconButton(
                         onClick = {

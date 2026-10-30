@@ -62,5 +62,10 @@ service cloud.firestore {
     match /users/{userId}/results/{resultId} {
       allow read, write: if isOwner(userId);
     }
+
+    match /app_config/{configId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
   }
 }

@@ -91,8 +91,19 @@ enum class ScreenState {
 @Composable
 fun MainAppContent(viewModel: TypingViewModel) {
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
+    val appUpdateInfo by viewModel.appUpdateInfo.collectAsStateWithLifecycle()
     var screenState by remember { mutableStateOf(ScreenState.TABS) }
     var currentDestination by remember { mutableStateOf(MainDestination.LEARN) }
+
+    // Update Dialog popup if a new version is available
+    appUpdateInfo?.let { update ->
+        if (update.isUpdateAvailable) {
+            com.example.ui.components.UpdateAvailableDialog(
+                updateInfo = update,
+                onDismiss = { viewModel.dismissUpdateDialog() }
+            )
+        }
+    }
 
     // If user is not logged in, enforce the onboarding login screen with full screen slider
     // Once logged in (currentUser != null), the login screen is never shown again!

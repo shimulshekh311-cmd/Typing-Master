@@ -40,6 +40,7 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     private val authRepository = com.example.data.repository.AuthRepository(application)
     private val leaderboardRepository = com.example.data.repository.LeaderboardRepository(application)
     private val userDataSyncRepository = com.example.data.repository.UserDataSyncRepository(application)
+    private val updateRepository = com.example.data.repository.AppUpdateRepository(application)
     private val vibrator = application.getSystemService(Vibrator::class.java)
 
     val subscriptionState: StateFlow<SubscriptionState> = subscriptionManager.subscriptionState
@@ -47,6 +48,11 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     val currentBannerCreative: StateFlow<AdCreative> = adManager.currentBannerCreative
     val showSubscriptionDialog = MutableStateFlow(false)
     val showInterstitialAd = MutableStateFlow(false)
+
+    // In-App Update State
+    val appUpdateInfo = MutableStateFlow<com.example.data.model.AppUpdateInfo?>(null)
+    val isCheckingForUpdate = MutableStateFlow(false)
+    val updateCheckStatusMessage = MutableStateFlow<String?>(null)
 
     // Firebase Auth State
     val currentUser: StateFlow<com.google.firebase.auth.FirebaseUser?> = authRepository.getAuthStateFlow().stateIn(
@@ -195,6 +201,9 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
         }
+
+        // Check for updates on startup
+        checkForUpdate(isManual = false)
     }
 
     // App Navigation & Selected Language
@@ -694,6 +703,78 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     fun clearAllResults() {
         viewModelScope.launch {
             repository.clearAll()
+        }
+    }
+
+    fun getCurrentAppVersion(): Pair<Long, String> {
+        return updateRepository.getCurrentVersion()
+    }
+
+    fun checkForUpdate(isManual: Boolean = false) {
+        viewModelScope.launch {
+            try {
+                isCheckingForUpdate.value = true
+                if (isManual) {
+                    updateCheckStatusMessage.value = "আপডেট চেক করা হচ্ছে..."
+                }
+                val info = updateRepository.fetchUpdateInfo()
+                if (info.isUpdateAvailable) {
+                    appUpdateInfo.value = info
+                    updateCheckStatusMessage.value = "নতুন ভার্সন পাওয়া গেছে: v${info.latestVersionName}"
+                } else {
+                    if (isManual) {
+                        updateCheckStatusMessage.value = "আপনার অ্যাপটি আপ-টু-ডেট আছে (ভার্সন v${info.currentVersionName})"
+                    }
+                }
+            } catch (e: Exception) {
+                if (isManual) {
+                    updateCheckStatusMessage.value = "আপডেট চেক করতে সমস্যা হয়েছে: ${e.message}"
+                }
+            } finally {
+                isCheckingForUpdate.value = false
+            }
+        }
+    }
+
+    fun dismissUpdateDialog() {
+        appUpdateInfo.value = null
+    }
+
+    fun simulateUpdateDialogForTesting() {
+        val (currentCode, currentName) = getCurrentAppVersion()
+        appUpdateInfo.value = com.example.data.model.AppUpdateInfo(
+            currentVersionCode = currentCode,
+            currentVersionName = currentName,
+            latestVersionCode = currentCode + 1,
+            latestVersionName = "1.1",
+            updateUrl = "https://github.com/brandifycreative",
+            releaseNotes = "১. নতুন স্পিড টেস্ট ড্যাশবোর্ড আপডেট\n২. অটো ক্লাউড ব্যাকআপ ও রেজাল্ট সিঙ্ক\n৩. নতুন প্রগ্রেস রিপোর্ট অ্যানালিটিক্স",
+            isForceUpdate = false,
+            isUpdateAvailable = true
+        )
+    }
+
+    fun publishRemoteVersion(
+        latestCode: Long,
+        latestName: String,
+        updateUrl: String,
+        releaseNotes: String,
+        isForceUpdate: Boolean = false
+    ) {
+        viewModelScope.launch {
+            val success = updateRepository.setRemoteVersionConfig(
+                latestCode = latestCode,
+                latestName = latestName,
+                updateUrl = updateUrl,
+                releaseNotes = releaseNotes,
+                isForceUpdate = isForceUpdate
+            )
+            if (success) {
+                updateCheckStatusMessage.value = "ক্লাউডে নতুন ভার্সন $latestName সফলভাবে সেভ করা হয়েছে"
+                checkForUpdate(isManual = true)
+            } else {
+                updateCheckStatusMessage.value = "ভার্সন সেভ করা যায়নি। নেটওয়ার্ক চেক করুন।"
+            }
         }
     }
 }

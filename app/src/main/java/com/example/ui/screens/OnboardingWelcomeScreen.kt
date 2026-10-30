@@ -106,7 +106,7 @@ fun OnboardingWelcomeScreen(
             subtitle = "আপনার টাইপিং ট্র্যাক করুন",
             description = "ক্লাউড অটো-সিঙ্ক সহ প্রতিটি টেস্টের ফলাফল ও বিগত দিনগুলোর অগ্রগতির গ্রাফিক্যাল রিপোর্ট।",
             badge = "ক্লাউড ব্যাকআপ ও রিপোর্ট",
-            imageResId = R.drawable.img_slide_speedtest
+            imageResId = R.drawable.img_slide_report
         )
     )
 
