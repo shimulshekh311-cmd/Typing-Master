@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -71,6 +72,7 @@ fun AccountScreen(
     val authMessage by viewModel.authMessage.collectAsStateWithLifecycle()
     val isCheckingForUpdate by viewModel.isCheckingForUpdate.collectAsStateWithLifecycle()
     val updateCheckStatusMessage by viewModel.updateCheckStatusMessage.collectAsStateWithLifecycle()
+    val appUpdateInfo by viewModel.appUpdateInfo.collectAsStateWithLifecycle()
     val (currentCode, currentName) = viewModel.getCurrentAppVersion()
 
     val reportYear by viewModel.reportYear.collectAsStateWithLifecycle()
@@ -476,6 +478,46 @@ fun AccountScreen(
                                 color = CyanAccent,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                             )
+                        }
+                    }
+
+                    // Direct Update Now button if update is available
+                    appUpdateInfo?.let { update ->
+                        if (update.isUpdateAvailable) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(
+                                onClick = {
+                                    try {
+                                        val url = if (update.updateUrl.isNotBlank()) update.updateUrl else "https://github.com/shimulshekh311-cmd/Typing-Master/releases"
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {}
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = CyanAccent,
+                                    contentColor = Color.Black
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                                    .testTag("account_direct_update_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Download,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color.Black
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Update Now (${update.latestVersionName})",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
                         }
                     }
 

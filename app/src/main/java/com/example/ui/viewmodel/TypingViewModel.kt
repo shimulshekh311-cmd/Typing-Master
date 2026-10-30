@@ -718,15 +718,20 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
                 val info = updateRepository.fetchUpdateInfo()
                 if (info.isUpdateAvailable) {
                     appUpdateInfo.value = info
-                    updateCheckStatusMessage.value = "নতুন ভার্সন পাওয়া গেছে: v${info.latestVersionName}"
+                    val formattedLatest = if (info.latestVersionName.startsWith("v", ignoreCase = true) || info.latestVersionName.startsWith("Build", ignoreCase = true)) {
+                        info.latestVersionName
+                    } else {
+                        "v${info.latestVersionName}"
+                    }
+                    updateCheckStatusMessage.value = "নতুন ভার্সন পাওয়া গেছে: $formattedLatest"
                 } else {
                     if (isManual) {
-                        updateCheckStatusMessage.value = "আপনার অ্যাপটি আপ-টু-ডেট আছে (ভার্সন v${info.currentVersionName})"
+                        updateCheckStatusMessage.value = "আপনার অ্যাপটি আপ-টু-ডেট আছে (ভার্সন v${info.currentVersionName}, বিল্ড ${info.currentVersionCode})"
                     }
                 }
             } catch (e: Exception) {
                 if (isManual) {
-                    updateCheckStatusMessage.value = "আপডেট চেক করতে সমস্যা হয়েছে: ${e.message}"
+                    updateCheckStatusMessage.value = "আপডেট চেক করতে সমস্যা হয়েছে: ইন্টারনেট সংযোগ চেক করুন"
                 }
             } finally {
                 isCheckingForUpdate.value = false
@@ -744,8 +749,8 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
             currentVersionCode = currentCode,
             currentVersionName = currentName,
             latestVersionCode = currentCode + 1,
-            latestVersionName = "1.1",
-            updateUrl = "https://github.com/brandifycreative",
+            latestVersionName = "Build #32",
+            updateUrl = "https://github.com/shimulshekh311-cmd/Typing-Master/releases",
             releaseNotes = "১. নতুন স্পিড টেস্ট ড্যাশবোর্ড আপডেট\n২. অটো ক্লাউড ব্যাকআপ ও রেজাল্ট সিঙ্ক\n৩. নতুন প্রগ্রেস রিপোর্ট অ্যানালিটিক্স",
             isForceUpdate = false,
             isUpdateAvailable = true

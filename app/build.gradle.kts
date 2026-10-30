@@ -23,12 +23,19 @@ android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
+  val propVersionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull()
+    ?: System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+    ?: 1
+  val propVersionName = project.findProperty("versionName")?.toString()
+    ?: System.getenv("GITHUB_RUN_NUMBER")?.let { "1.0.$it" }
+    ?: "1.0"
+
   defaultConfig {
     applicationId = "com.aistudio.typingmaster.bngtyp"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = propVersionCode
+    versionName = propVersionName
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

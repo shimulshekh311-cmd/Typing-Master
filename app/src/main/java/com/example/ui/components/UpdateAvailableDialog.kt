@@ -53,10 +53,18 @@ fun UpdateAvailableDialog(
 ) {
     val context = LocalContext.current
 
+    val formattedLatest = if (updateInfo.latestVersionName.startsWith("v", ignoreCase = true) || updateInfo.latestVersionName.startsWith("Build", ignoreCase = true)) {
+        updateInfo.latestVersionName
+    } else {
+        "v${updateInfo.latestVersionName}"
+    }
+
     fun openUpdateUrl() {
         try {
-            val url = if (updateInfo.updateUrl.isNotBlank()) updateInfo.updateUrl else "https://github.com/brandifycreative"
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            val url = if (updateInfo.updateUrl.isNotBlank()) updateInfo.updateUrl else "https://github.com/shimulshekh311-cmd/Typing-Master/releases"
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
             context.startActivity(intent)
         } catch (_: Exception) {}
     }
@@ -121,7 +129,7 @@ fun UpdateAvailableDialog(
 
                 // Subtitle in Bengali
                 Text(
-                    text = "নতুন ভার্সন v${updateInfo.latestVersionName} প্রকাশ করা হয়েছে!",
+                    text = "নতুন সংস্করণ $formattedLatest প্রকাশ করা হয়েছে!",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = CyanAccent,
@@ -153,7 +161,7 @@ fun UpdateAvailableDialog(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "নতুন: v${updateInfo.latestVersionName}",
+                            text = "নতুন: $formattedLatest",
                             fontSize = 12.sp,
                             color = Color(0xFF38BDF8),
                             fontWeight = FontWeight.ExtraBold
