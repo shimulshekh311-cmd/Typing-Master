@@ -120,18 +120,51 @@ fun TypingResultItemCard(
                         maxLines = 1
                     )
 
-                    // Language Tag
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (isEnglish) CyanAccent.copy(alpha = 0.15f) else VioletSecondary.copy(alpha = 0.15f)
+                    // Language & Govt Status Tags
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = if (isEnglish) "English" else "বাংলা",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isEnglish) CyanAccent else VioletSecondary
-                        )
+                        if (result.errorRatePercent > 5.0f) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = RoseError.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = "ফেল (${String.format(Locale.US, "%.1f", result.errorRatePercent)}% ভুল)",
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = RoseError
+                                )
+                            }
+                        } else if (result.isPassedGovtRule) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = EmeraldSuccess.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = "পাস (ভুল ≤ ৫%)",
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = EmeraldSuccess
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (isEnglish) CyanAccent.copy(alpha = 0.15f) else VioletSecondary.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = if (isEnglish) "English" else "বাংলা",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isEnglish) CyanAccent else VioletSecondary
+                            )
+                        }
                     }
                 }
 
@@ -189,6 +222,28 @@ fun TypingResultItemCard(
                             text = "${result.durationSeconds}s",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(3.dp))
+
+                // Keystrokes & Error rate details
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "কী-স্ট্রোক: ${result.totalCharsTyped} (${result.totalCharsTyped / 5} শব্দ)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (result.incorrectWords > 0 || result.errorRatePercent > 0f) {
+                        Text(
+                            text = "ভুল: ${result.incorrectWords} শব্দ (${String.format(Locale.US, "%.1f", result.errorRatePercent)}%)",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (result.errorRatePercent > 5.0f) RoseError else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

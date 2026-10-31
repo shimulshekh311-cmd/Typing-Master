@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import java.util.Locale
 
 class TypingViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -53,6 +54,11 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     val appUpdateInfo = MutableStateFlow<com.example.data.model.AppUpdateInfo?>(null)
     val isCheckingForUpdate = MutableStateFlow(false)
     val updateCheckStatusMessage = MutableStateFlow<String?>(null)
+    private val inAppUpdateDownloader = com.example.data.repository.InAppUpdateDownloader(application)
+    val updateDownloadState = MutableStateFlow<com.example.data.repository.UpdateDownloadState>(
+        com.example.data.repository.UpdateDownloadState.Idle
+    )
+    private var downloadJob: Job? = null
 
     // Firebase Auth State
     val currentUser: StateFlow<com.google.firebase.auth.FirebaseUser?> = authRepository.getAuthStateFlow().stateIn(
@@ -245,6 +251,19 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
     private val _mistakeCount = MutableStateFlow(0)
     val mistakeCount: StateFlow<Int> = _mistakeCount.asStateFlow()
 
+    private val _correctWordsCount = MutableStateFlow(0)
+    val correctWordsCount: StateFlow<Int> = _correctWordsCount.asStateFlow()
+
+    private val _incorrectWordsCount = MutableStateFlow(0)
+    val incorrectWordsCount: StateFlow<Int> = _incorrectWordsCount.asStateFlow()
+
+    // Bangladesh Govt Typing Rule (2024 Gazette): 5% Error Threshold
+    private val _liveErrorRatePercent = MutableStateFlow(0f)
+    val liveErrorRatePercent: StateFlow<Float> = _liveErrorRatePercent.asStateFlow()
+
+    private val _isLiveFailingGovtRule = MutableStateFlow(false)
+    val isLiveFailingGovtRule: StateFlow<Boolean> = _isLiveFailingGovtRule.asStateFlow()
+
     // Input layout for Bangla: Bijoy (PC / External Keyboard) or Avro / System
     val inputLayoutMode = MutableStateFlow(com.example.data.model.InputLayoutMode.BIJOY)
 
@@ -405,6 +424,10 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         _liveWpm.value = 0
         _liveAccuracy.value = 100f
         _mistakeCount.value = 0
+        _correctWordsCount.value = 0
+        _incorrectWordsCount.value = 0
+        _liveErrorRatePercent.value = 0f
+        _isLiveFailingGovtRule.value = false
         _lastCompletedResult.value = null
         sessionStartTimeMs = 0L
 
@@ -471,6 +494,12 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
+        // If the character is already a Bengali Unicode character (from soft keyboard, IME, or Bengali physical layout)
+        if (keyChar in '\u0980'..'\u09FF') {
+            onUserInputChange(_userInput.value + keyChar)
+            return
+        }
+
         if (_selectedLanguage.value == TypingLanguage.BANGLA && inputLayoutMode.value == com.example.data.model.InputLayoutMode.BIJOY) {
             val newText = com.example.data.bijoy.BijoyLayoutEngine.processKeystroke(_userInput.value, keyChar)
             onUserInputChange(newText)
@@ -522,8 +551,12 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         val unicodeChar = event.getUnicodeChar(event.metaState)
         if (unicodeChar != 0) {
             val char = unicodeChar.toChar()
-            if (char in 'a'..'z' || char in 'A'..'Z' || char in "0123456789.,;:'\"/\\`~!@#$%^&*()-=_+[]{}|<>?\n") {
-                if (_selectedLanguage.value == TypingLanguage.BANGLA && inputLayoutMode.value == com.example.data.model.InputLayoutMode.BIJOY) {
+            val isBengali = char in '\u0980'..'\u09FF'
+            val isAsciiOrSymbol = char in 'a'..'z' || char in 'A'..'Z' || char in "0123456789.,;:'\"/\\`~!@#$%^&*()-=_+[]{}|<>?\n "
+            if (isBengali || isAsciiOrSymbol || (!Character.isISOControl(char) && char != '\u0000')) {
+                if (isBengali) {
+                    onUserInputChange(_userInput.value + char)
+                } else if (_selectedLanguage.value == TypingLanguage.BANGLA && inputLayoutMode.value == com.example.data.model.InputLayoutMode.BIJOY) {
                     handlePhysicalKey(char)
                 } else {
                     onUserInputChange(_userInput.value + char)
@@ -556,68 +589,75 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         val normTarget = java.text.Normalizer.normalize(target, java.text.Normalizer.Form.NFC)
         val normInput = java.text.Normalizer.normalize(input, java.text.Normalizer.Form.NFC)
 
-        if (isPaperMode.value) {
-            // Paper Copy Mode: transcribe from physical paper
-            var mistakes = 0
-            if (normTarget.isNotEmpty()) {
-                val minLen = minOf(normTarget.length, normInput.length)
-                for (i in 0 until minLen) {
-                    if (normTarget[i] != normInput[i]) {
-                        mistakes++
+        // 1. Word Analysis: ONLY analyze words typed so far (never penalize untyped text)
+        val targetWords = if (normTarget.isBlank()) emptyList() else normTarget.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val typedWords = if (normInput.isBlank()) emptyList() else normInput.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+
+        var correctWords = 0
+        var incorrectWords = 0
+
+        for (i in typedWords.indices) {
+            val typedW = typedWords[i]
+            if (i < targetWords.size) {
+                val targetW = targetWords[i]
+                if (typedW == targetW) {
+                    correctWords++
+                } else {
+                    val isLastWordBeingTyped = (i == typedWords.size - 1) && !input.endsWith(" ") && !input.endsWith("\n")
+                    if (isLastWordBeingTyped && targetW.startsWith(typedW)) {
+                        // Word in progress of being typed correctly
+                    } else {
+                        incorrectWords++
                     }
                 }
-            }
-            _mistakeCount.value = mistakes
-
-            val correctChars = (totalTyped - mistakes).coerceAtLeast(0)
-            val accuracy = if (totalTyped > 0) {
-                if (normTarget.isNotEmpty()) {
-                    ((correctChars.toFloat() / totalTyped.toFloat()) * 100f).coerceIn(0f, 100f)
-                } else {
-                    100f
-                }
             } else {
-                100f
+                incorrectWords++
             }
-            _liveAccuracy.value = accuracy
-
-            val wpm = if (minutes > 0f) {
-                ((totalTyped / 5.0f) / minutes).toInt().coerceAtLeast(0)
-            } else {
-                0
-            }
-            _liveWpm.value = wpm
-        } else {
-            var mistakes = 0
-            val minLen = minOf(normTarget.length, normInput.length)
-            for (i in 0 until minLen) {
-                if (normTarget[i] != normInput[i]) {
-                    mistakes++
-                }
-            }
-            if (normInput.length > normTarget.length) {
-                mistakes += (normInput.length - normTarget.length)
-            }
-            _mistakeCount.value = mistakes
-
-            val correctChars = (totalTyped - mistakes).coerceAtLeast(0)
-
-            // Accuracy calculation
-            val accuracy = if (totalTyped > 0) {
-                ((correctChars.toFloat() / totalTyped.toFloat()) * 100f).coerceIn(0f, 100f)
-            } else {
-                100f
-            }
-            _liveAccuracy.value = accuracy
-
-            // WPM calculation: 1 word = 5 characters
-            val wpm = if (minutes > 0f) {
-                ((correctChars / 5.0f) / minutes).toInt().coerceAtLeast(0)
-            } else {
-                0
-            }
-            _liveWpm.value = wpm
         }
+
+        _correctWordsCount.value = correctWords
+        _incorrectWordsCount.value = incorrectWords
+
+        // Bangladesh Govt 5% Error Rule calculation
+        val totalWordsTyped = correctWords + incorrectWords
+        val errorRate = if (totalWordsTyped > 0) {
+            ((incorrectWords.toFloat() / totalWordsTyped.toFloat()) * 100f).coerceIn(0f, 100f)
+        } else {
+            0f
+        }
+        _liveErrorRatePercent.value = errorRate
+        _isLiveFailingGovtRule.value = (errorRate > 5.0f && totalWordsTyped >= 3)
+
+        // 2. Character mistakes analysis (strictly for typed portion)
+        var mistakes = 0
+        val evalLen = minOf(normTarget.length, normInput.length)
+        for (i in 0 until evalLen) {
+            if (normTarget[i] != normInput[i]) {
+                mistakes++
+            }
+        }
+        if (normInput.length > normTarget.length) {
+            mistakes += (normInput.length - normTarget.length)
+        }
+        _mistakeCount.value = mistakes
+
+        // 3. WPM calculation: Pure typing pace, mistakes have NO negative effect on WPM
+        // "শব্দ ভুল থাকলেও WPM বিশ্লেষণে কোনো প্রভাব পড়বে না"
+        val wpm = if (minutes > 0f && totalTyped > 0) {
+            ((totalTyped / 5.0f) / minutes).toInt().coerceAtLeast(0)
+        } else {
+            0
+        }
+        _liveWpm.value = wpm
+
+        // 4. Accuracy calculation: based strictly on what has been typed so far
+        val correctChars = (totalTyped - mistakes).coerceAtLeast(0)
+        val accuracy = if (totalTyped > 0) {
+            ((correctChars.toFloat() / totalTyped.toFloat()) * 100f).coerceIn(0f, 100f)
+        } else {
+            100f
+        }
+        _liveAccuracy.value = accuracy
     }
 
     fun finishSession() {
@@ -636,6 +676,27 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
         val cpm = ((correctChars / duration.toFloat()) * 60f).toInt()
         val wpm = _liveWpm.value
         val accuracy = _liveAccuracy.value
+        val correctWords = _correctWordsCount.value
+        val incorrectWords = _incorrectWordsCount.value
+
+        // Official Bangladesh Govt Typing Test Rules (২০২৪ সালের বিভাগীয় কমিশনার অফিসের নিয়োগবিধির সংশোধিত গেজেট):
+        // 1. ৫টি কী-স্ট্রোক = ১টি শব্দ (Word = Keystrokes / 5)
+        // 2. মিনিটে ২০ WPM অর্জনের জন্য প্রয়োজনীয় কী-স্ট্রোক: ২০ × ৫ = ১০০টি
+        // 3. ৫% ভুলের নিয়ম: ৫%-এর বেশি ভুল শব্দ হলে প্রয়োজনীয় গতি অর্জিত হয়নি বলে গণ্য হবে (ফেল / FAILED)
+        // 4. ভুল শব্দ ৫% বা তার কম এবং ন্যূনতম গতি (২০ WPM) অর্জিত হলে কৃতকার্য (PASSED)
+        val totalWords = correctWords + incorrectWords
+        val errorRate = if (totalWords > 0) {
+            ((incorrectWords.toFloat() / totalWords.toFloat()) * 100f).coerceIn(0f, 100f)
+        } else {
+            0f
+        }
+        val requiredTargetWpm = 20
+        val isPassed = (errorRate <= 5.0f) && (wpm >= requiredTargetWpm)
+        val failureReason = when {
+            errorRate > 5.0f -> "ভুলের হার ৫%-এর বেশি (${String.format(Locale.US, "%.1f", errorRate)}%) — ২০২৪ গেজেট অনুযায়ী গতি অর্জিত হয়নি (ফেল)"
+            wpm < requiredTargetWpm -> "গতি ন্যূনতম ২০ WPM-এর কম (${wpm} WPM)"
+            else -> ""
+        }
 
         val result = TypingResult(
             timestamp = System.currentTimeMillis(),
@@ -648,7 +709,12 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
             durationSeconds = duration,
             totalCharsTyped = totalChars,
             correctChars = correctChars,
-            mistakeCount = mistakes
+            mistakeCount = mistakes,
+            correctWords = correctWords,
+            incorrectWords = incorrectWords,
+            errorRatePercent = errorRate,
+            isPassedGovtRule = isPassed,
+            failureReason = failureReason
         )
 
         _lastCompletedResult.value = result
@@ -741,17 +807,49 @@ class TypingViewModel(application: Application) : AndroidViewModel(application) 
 
     fun dismissUpdateDialog() {
         appUpdateInfo.value = null
+        resetDownloadState()
+    }
+
+    fun startDownloadUpdate(url: String) {
+        downloadJob?.cancel()
+        downloadJob = viewModelScope.launch {
+            val targetUrl = url.ifBlank {
+                "https://github.com/shimulshekh311-cmd/Typing-Master/releases/latest/download/app-debug.apk"
+            }
+            inAppUpdateDownloader.downloadApk(targetUrl) { state ->
+                updateDownloadState.value = state
+            }
+        }
+    }
+
+    fun installDownloadedApk(context: android.content.Context) {
+        val state = updateDownloadState.value
+        val apkFile = when (state) {
+            is com.example.data.repository.UpdateDownloadState.ReadyToInstall -> state.apkFile
+            else -> inAppUpdateDownloader.getDestinationApkFile().takeIf { it.exists() }
+        }
+        if (apkFile != null && apkFile.exists()) {
+            inAppUpdateDownloader.installApk(apkFile)
+        } else {
+            android.widget.Toast.makeText(context, "ইনস্টলার ফাইল পাওয়া যায়নি, অনুগ্রহ করে পুনরায় ডাউনলোড করুন", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun resetDownloadState() {
+        downloadJob?.cancel()
+        updateDownloadState.value = com.example.data.repository.UpdateDownloadState.Idle
     }
 
     fun simulateUpdateDialogForTesting() {
         val (currentCode, currentName) = getCurrentAppVersion()
+        resetDownloadState()
         appUpdateInfo.value = com.example.data.model.AppUpdateInfo(
             currentVersionCode = currentCode,
             currentVersionName = currentName,
             latestVersionCode = currentCode + 1,
             latestVersionName = "Build #32",
-            updateUrl = "https://github.com/shimulshekh311-cmd/Typing-Master/releases",
-            releaseNotes = "১. নতুন স্পিড টেস্ট ড্যাশবোর্ড আপডেট\n২. অটো ক্লাউড ব্যাকআপ ও রেজাল্ট সিঙ্ক\n৩. নতুন প্রগ্রেস রিপোর্ট অ্যানালিটিক্স",
+            updateUrl = "https://github.com/shimulshekh311-cmd/Typing-Master/releases/download/debug-apk-build-32/app-debug.apk",
+            releaseNotes = "১. নতুন ইন-অ্যাপ ডাউনলোড ও প্রগ্রেস বার\n২. ডাউনলোড শেষে এক ক্লিকে Install Now\n৩. নতুন স্পিড টেস্ট ড্যাশবোর্ড আপডেট",
             isForceUpdate = false,
             isUpdateAvailable = true
         )

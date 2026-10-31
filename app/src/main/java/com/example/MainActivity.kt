@@ -101,6 +101,7 @@ fun MainAppContent(viewModel: TypingViewModel) {
         if (update.isUpdateAvailable) {
             com.example.ui.components.UpdateAvailableDialog(
                 updateInfo = update,
+                viewModel = viewModel,
                 onDismiss = { viewModel.dismissUpdateDialog() }
             )
         }

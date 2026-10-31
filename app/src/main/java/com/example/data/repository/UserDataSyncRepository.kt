@@ -37,7 +37,12 @@ class UserDataSyncRepository(private val context: Context) {
                 "durationSeconds" to result.durationSeconds,
                 "totalCharsTyped" to result.totalCharsTyped,
                 "correctChars" to result.correctChars,
-                "mistakeCount" to result.mistakeCount
+                "mistakeCount" to result.mistakeCount,
+                "correctWords" to result.correctWords,
+                "incorrectWords" to result.incorrectWords,
+                "errorRatePercent" to result.errorRatePercent.toDouble(),
+                "isPassedGovtRule" to result.isPassedGovtRule,
+                "failureReason" to result.failureReason
             )
             db.collection(COLLECTION_USERS)
                 .document(userId)
@@ -77,6 +82,12 @@ class UserDataSyncRepository(private val context: Context) {
                         val totalCharsTyped = doc.getLong("totalCharsTyped")?.toInt() ?: 0
                         val correctChars = doc.getLong("correctChars")?.toInt() ?: 0
                         val mistakeCount = doc.getLong("mistakeCount")?.toInt() ?: 0
+                        val correctWords = doc.getLong("correctWords")?.toInt() ?: 0
+                        val incorrectWords = doc.getLong("incorrectWords")?.toInt() ?: 0
+                        val errorRatePercent = doc.getDouble("errorRatePercent")?.toFloat()
+                            ?: (doc.getLong("errorRatePercent")?.toFloat() ?: 0f)
+                        val isPassedGovtRule = doc.getBoolean("isPassedGovtRule") ?: false
+                        val failureReason = doc.getString("failureReason") ?: ""
 
                         TypingResult(
                             id = 0,
@@ -90,7 +101,12 @@ class UserDataSyncRepository(private val context: Context) {
                             durationSeconds = durationSeconds,
                             totalCharsTyped = totalCharsTyped,
                             correctChars = correctChars,
-                            mistakeCount = mistakeCount
+                            mistakeCount = mistakeCount,
+                            correctWords = correctWords,
+                            incorrectWords = incorrectWords,
+                            errorRatePercent = errorRatePercent,
+                            isPassedGovtRule = isPassedGovtRule,
+                            failureReason = failureReason
                         )
                     } catch (_: Throwable) {
                         null

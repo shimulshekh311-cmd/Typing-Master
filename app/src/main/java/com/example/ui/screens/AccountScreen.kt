@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +34,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -49,13 +51,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.repository.UpdateDownloadState
 import com.example.ui.components.AdBannerView
 import com.example.ui.components.GoogleSignInCard
 import com.example.ui.components.MonthlyAccuracyChart
 import com.example.ui.components.MonthlySpeedChart
 import com.example.ui.components.MonthlySummaryCards
 import com.example.ui.theme.CyanAccent
+import com.example.ui.theme.EmeraldSuccess
 import com.example.ui.theme.IndigoPrimary
+import com.example.ui.theme.RoseError
 import com.example.ui.theme.VioletSecondary
 import com.example.ui.viewmodel.TypingViewModel
 import java.text.DateFormatSymbols
@@ -73,6 +78,7 @@ fun AccountScreen(
     val isCheckingForUpdate by viewModel.isCheckingForUpdate.collectAsStateWithLifecycle()
     val updateCheckStatusMessage by viewModel.updateCheckStatusMessage.collectAsStateWithLifecycle()
     val appUpdateInfo by viewModel.appUpdateInfo.collectAsStateWithLifecycle()
+    val updateDownloadState by viewModel.updateDownloadState.collectAsStateWithLifecycle()
     val (currentCode, currentName) = viewModel.getCurrentAppVersion()
 
     val reportYear by viewModel.reportYear.collectAsStateWithLifecycle()
@@ -481,42 +487,136 @@ fun AccountScreen(
                         }
                     }
 
-                    // Direct Update Now button if update is available
+                    // In-app Download & Install if update is available
                     appUpdateInfo?.let { update ->
                         if (update.isUpdateAvailable) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Button(
-                                onClick = {
-                                    try {
-                                        val url = if (update.updateUrl.isNotBlank()) update.updateUrl else "https://github.com/shimulshekh311-cmd/Typing-Master/releases"
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            when (val state = updateDownloadState) {
+                                is UpdateDownloadState.Downloading -> {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(Color(0xFF1E293B))
+                                            .padding(12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "ডাউনলোড হচ্ছে...",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = CyanAccent
+                                            )
+                                            Text(
+                                                text = "${state.progressPercent}%",
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = CyanAccent
+                                            )
                                         }
-                                        context.startActivity(intent)
-                                    } catch (_: Exception) {}
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = CyanAccent,
-                                    contentColor = Color.Black
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(44.dp)
-                                    .testTag("account_direct_update_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Download,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = Color.Black
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Update Now (${update.latestVersionName})",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
+
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        LinearProgressIndicator(
+                                            progress = { state.progressPercent / 100f },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(8.dp)
+                                                .clip(RoundedCornerShape(4.dp)),
+                                            color = CyanAccent,
+                                            trackColor = Color(0xFF334155)
+                                        )
+
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        val downloadedFormatted = String.format(Locale.US, "%.1f", state.downloadedMb)
+                                        val totalFormatted = if (state.totalMb > 0) String.format(Locale.US, "%.1f", state.totalMb) else "?"
+                                        Text(
+                                            text = "$downloadedFormatted MB / $totalFormatted MB",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                    }
+                                }
+
+                                is UpdateDownloadState.ReadyToInstall -> {
+                                    Button(
+                                        onClick = { viewModel.installDownloadedApk(context) },
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = EmeraldSuccess,
+                                            contentColor = Color.Black
+                                        ),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(48.dp)
+                                            .testTag("account_install_now_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.SystemUpdate,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(20.dp),
+                                            tint = Color.Black
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Install Now (ইনস্টল করুন)",
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 15.sp
+                                        )
+                                    }
+                                }
+
+                                is UpdateDownloadState.Error -> {
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Text(
+                                            text = state.message,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = RoseError
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Button(
+                                            onClick = { viewModel.startDownloadUpdate(update.updateUrl) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = CyanAccent, contentColor = Color.Black),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Text("পুনরায় ডাউনলোড করুন")
+                                        }
+                                    }
+                                }
+
+                                else -> {
+                                    Button(
+                                        onClick = { viewModel.startDownloadUpdate(update.updateUrl) },
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = CyanAccent,
+                                            contentColor = Color.Black
+                                        ),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(46.dp)
+                                            .testTag("account_direct_update_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Download,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                            tint = Color.Black
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Update Now (${update.latestVersionName})",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

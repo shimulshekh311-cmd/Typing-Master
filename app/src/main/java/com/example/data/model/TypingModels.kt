@@ -54,7 +54,12 @@ data class TypingResult(
     val durationSeconds: Int,
     val totalCharsTyped: Int,
     val correctChars: Int,
-    val mistakeCount: Int
+    val mistakeCount: Int,
+    val correctWords: Int = 0,
+    val incorrectWords: Int = 0,
+    val errorRatePercent: Float = 0f,
+    val isPassedGovtRule: Boolean = false,
+    val failureReason: String = ""
 )
 
 data class MonthlyDayStat(

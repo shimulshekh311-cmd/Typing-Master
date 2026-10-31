@@ -90,7 +90,7 @@ fun SpeedTestScreen(
     var selectedDuration by remember { mutableIntStateOf(120) }
     var selectedLanguage by remember { mutableStateOf(TypingLanguage.BANGLA) }
     val currentScrollWpm by viewModel.targetScrollWpm.collectAsStateWithLifecycle()
-    var selectedScrollWpm by remember { mutableIntStateOf(if (currentScrollWpm in 20..40) currentScrollWpm else 20) }
+    var selectedScrollWpm by remember { mutableIntStateOf(if (currentScrollWpm in 0..40) currentScrollWpm else 0) }
 
     // Pre-test source mode selection: Paragraph, Paper copy, or Custom text
     var selectedSourceMode by remember { mutableStateOf(SpeedTestSourceMode.PARAGRAPH) }
@@ -123,8 +123,9 @@ fun SpeedTestScreen(
         600 to "১০ মিনিট"
     )
 
-    // Scroll speed options: 20 to 40 WPM
+    // Scroll speed options: প্রথম অপশন টাইপিং অনুযায়ী, তারপর ২০ থেকে ৪০ WPM
     val scrollSpeedOptions = listOf(
+        0 to "টাইপিং অনুযায়ী",
         20 to "২০ WPM",
         25 to "২৫ WPM",
         30 to "৩০ WPM",

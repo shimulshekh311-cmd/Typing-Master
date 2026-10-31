@@ -157,4 +157,51 @@ class ExampleUnitTest {
     // Bengali Digits
     assertEquals("১২৩৪৫৬৭৮৯০", typeString("1234567890"))
   }
+
+  @Test
+  fun testBangladeshGovtTypingExamRules() {
+    // Rule 1: 5 keystrokes = 1 word
+    val keystrokes = 100
+    val wordsFromKeystrokes = keystrokes / 5
+    assertEquals(20, wordsFromKeystrokes)
+
+    // Speed calculation: 100 keystrokes in 1 minute = 20 WPM
+    val durationMinutes = 1.0f
+    val wpm = (keystrokes / 5.0f) / durationMinutes
+    assertEquals(20.0f, wpm, 0.01f)
+
+    // Rule 2: 5% Error Rule (২০২৪ গেজেট)
+    // Case A: 100 words typed, 5 incorrect -> 5.0% error -> PASSES if speed >= 20 WPM
+    val wordsTypedA = 100
+    val incorrectA = 5
+    val errorRateA = (incorrectA.toFloat() / wordsTypedA.toFloat()) * 100f
+    assertEquals(5.0f, errorRateA, 0.01f)
+    val isPassedA = (errorRateA <= 5.0f) && (wpm >= 20)
+    assertEquals(true, isPassedA)
+
+    // Case B: 100 words typed, 6 incorrect -> 6.0% error (> 5%) -> FAILS even if speed is 30 WPM
+    val wordsTypedB = 100
+    val incorrectB = 6
+    val errorRateB = (incorrectB.toFloat() / wordsTypedB.toFloat()) * 100f
+    assertEquals(6.0f, errorRateB, 0.01f)
+    val speedB = 30
+    val isPassedB = (errorRateB <= 5.0f) && (speedB >= 20)
+    assertEquals(false, isPassedB) // Fails due to exceeding 5% error rate
+
+    // Case C: 20 words typed, 1 incorrect -> 5.0% error -> PASSES if speed >= 20
+    val wordsTypedC = 20
+    val incorrectC = 1
+    val errorRateC = (incorrectC.toFloat() / wordsTypedC.toFloat()) * 100f
+    assertEquals(5.0f, errorRateC, 0.01f)
+    val isPassedC = (errorRateC <= 5.0f) && (wpm >= 20)
+    assertEquals(true, isPassedC)
+
+    // Case D: 20 words typed, 2 incorrect -> 10.0% error -> FAILS
+    val wordsTypedD = 20
+    val incorrectD = 2
+    val errorRateD = (incorrectD.toFloat() / wordsTypedD.toFloat()) * 100f
+    assertEquals(10.0f, errorRateD, 0.01f)
+    val isPassedD = (errorRateD <= 5.0f) && (wpm >= 20)
+    assertEquals(false, isPassedD)
+  }
 }

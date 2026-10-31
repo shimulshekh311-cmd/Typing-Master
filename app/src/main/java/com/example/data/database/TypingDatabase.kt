@@ -12,7 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-@Database(entities = [TypingResult::class], version = 2, exportSchema = false)
+@Database(entities = [TypingResult::class], version = 3, exportSchema = false)
 abstract class TypingDatabase : RoomDatabase() {
 
     abstract fun typingResultDao(): TypingResultDao

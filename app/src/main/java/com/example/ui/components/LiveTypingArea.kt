@@ -77,6 +77,10 @@ import androidx.compose.ui.unit.sp
 import com.example.data.bijoy.BijoyLayoutEngine
 import com.example.data.model.InputLayoutMode
 import com.example.data.model.TypingLanguage
+import androidx.compose.material.icons.filled.Spellcheck
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.EmeraldSuccess
@@ -106,7 +110,11 @@ fun LiveTypingDisplay(
     modifier: Modifier = Modifier,
     isTimerRunning: Boolean = false,
     targetScrollWpm: Int = 0,
-    onSetTargetScrollWpm: (Int) -> Unit = {}
+    onSetTargetScrollWpm: (Int) -> Unit = {},
+    correctWordsCount: Int = 0,
+    incorrectWordsCount: Int = 0,
+    liveErrorRatePercent: Float = 0f,
+    isLiveFailingGovtRule: Boolean = false
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -116,28 +124,14 @@ fun LiveTypingDisplay(
     val typedScrollState = rememberScrollState()
     val isBanglaBijoy = language == TypingLanguage.BANGLA && inputLayoutMode == InputLayoutMode.BIJOY
 
-    // Soft keyboard state (kept OFF by default, especially in landscape)
-    var useSoftwareKeyboard by remember { mutableStateOf(false) }
-    val softKeyboardFocusRequester = remember { FocusRequester() }
+    // Soft keyboard state
+    var isSoftKeyboardVisible by remember { mutableStateOf(false) }
 
-    // When landscape mode is active, automatically keep the software keyboard hidden
-    LaunchedEffect(isLandscape) {
-        if (isLandscape) {
-            keyboardController?.hide()
-            useSoftwareKeyboard = false
-        }
-    }
-
-    // Auto-hide software keyboard unless explicitly enabled by user
-    LaunchedEffect(useSoftwareKeyboard) {
-        if (!useSoftwareKeyboard) {
-            keyboardController?.hide()
-        } else {
-            kotlinx.coroutines.delay(100)
-            try {
-                softKeyboardFocusRequester.requestFocus()
-            } catch (_: Exception) {}
-        }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(200)
+        try {
+            focusRequester.requestFocus()
+        } catch (_: Exception) {}
     }
 
     // Target Words and Current Word Index
@@ -211,23 +205,36 @@ fun LiveTypingDisplay(
         val typingScrollPx = (typingScrollLine * singleLineHeightPx).coerceIn(0, sampleScrollState.maxValue)
 
         // Constant speed WPM pacer scroll (if targetScrollWpm > 0 and timer has started)
+        // First line gently accelerates gradually from the start: "স্ক্রোলিং গতি প্রথমে(প্রথম লাইনের জন্য) হালকা ধীরে ধীরে গতি বাড়বে"
         val pacerScrollPx = if (targetScrollWpm > 0 && isTimerRunning && elapsedSeconds > 0 && targetWords.isNotEmpty()) {
             val totalSecondsForText = (targetWords.size.toFloat() / targetScrollWpm) * 60f
-            val ratio = (elapsedSeconds.toFloat() / totalSecondsForText.coerceAtLeast(10f)).coerceIn(0f, 1f)
+            val firstLineWarmupSec = ((9f / targetScrollWpm) * 60f).coerceIn(6f, 20f)
+            val t = elapsedSeconds.toFloat()
+            val effectiveElapsed = if (t < firstLineWarmupSec) {
+                // Smooth quadratic ease-in for first line
+                0.5f * (t * t / firstLineWarmupSec)
+            } else {
+                0.5f * firstLineWarmupSec + (t - firstLineWarmupSec)
+            }
+            val ratio = (effectiveElapsed / totalSecondsForText.coerceAtLeast(10f)).coerceIn(0f, 1f)
             (ratio * sampleScrollState.maxValue).toInt()
         } else {
             0
         }
 
         // Whichever is further down takes priority so the user never runs out of visible text
-        val finalTargetScrollPx = maxOf(typingScrollPx, pacerScrollPx).coerceIn(0, sampleScrollState.maxValue)
+        val finalTargetScrollPx = if (targetScrollWpm == 0) {
+            typingScrollPx
+        } else {
+            maxOf(typingScrollPx, pacerScrollPx)
+        }.coerceIn(0, sampleScrollState.maxValue)
 
         sampleScrollState.animateScrollTo(finalTargetScrollPx)
         typedScrollState.animateScrollTo(finalTargetScrollPx.coerceIn(0, typedScrollState.maxValue))
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
-        // 1. Real-time HUD (WPM, Accuracy, Time, Mistakes)
+        // 1. Real-time HUD (WPM, Accuracy, Time, Correct / Incorrect Words)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -266,11 +273,11 @@ fun LiveTypingDisplay(
             )
 
             HudStatBadge(
-                label = if (isPaperMode) "Typed Chars" else "Errors",
-                value = if (isPaperMode) "${userInput.length}" else "$mistakeCount",
-                icon = if (isPaperMode) Icons.Default.Article else Icons.Default.Close,
-                tint = if (isPaperMode) CyanAccent else (if (mistakeCount > 0) RoseError else MaterialTheme.colorScheme.onSurfaceVariant),
-                modifier = Modifier.weight(1f)
+                label = if (isPaperMode) "Typed Chars" else "সঠিক/ভুল শব্দ",
+                value = if (isPaperMode) "${userInput.length}" else "$correctWordsCount / $incorrectWordsCount",
+                icon = if (isPaperMode) Icons.Default.Article else Icons.Default.Spellcheck,
+                tint = if (isPaperMode) CyanAccent else (if (incorrectWordsCount > 0) RoseError else EmeraldSuccess),
+                modifier = Modifier.weight(1.15f)
             )
         }
 
@@ -302,6 +309,37 @@ fun LiveTypingDisplay(
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = AmberWarning
+                    )
+                }
+            }
+        }
+
+        // Realtime 5% Error Rule Alert Banner (২০২৪ গেজেট বিধি)
+        AnimatedVisibility(visible = isLiveFailingGovtRule) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                shape = RoundedCornerShape(10.dp),
+                color = RoseError.copy(alpha = 0.15f),
+                border = BorderStroke(1.dp, RoseError.copy(alpha = 0.6f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        tint = RoseError,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "⚠️ ভুলের হার ৫%-এর বেশি (${String.format(Locale.US, "%.1f", liveErrorRatePercent)}%) — ২০২৪ গেজেট অনুযায়ী গতি অর্জিত হয়নি (ফেল)!",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = RoseError
                     )
                 }
             }
@@ -353,7 +391,7 @@ fun LiveTypingDisplay(
                         modifier = Modifier.clickable { showScrollSpeedDialog = true }
                     ) {
                         Text(
-                            text = if (targetScrollWpm == 0) "📜 স্ক্রোল: অটো" else "📜 ${targetScrollWpm} WPM",
+                            text = if (targetScrollWpm == 0) "📜 স্ক্রোল: টাইপিং অনুযায়ী" else "📜 ${targetScrollWpm} WPM",
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 11.sp,
@@ -364,44 +402,26 @@ fun LiveTypingDisplay(
 
                     Spacer(modifier = Modifier.width(6.dp))
 
-                    // If not in landscape, user can toggle on-screen soft keyboard if needed
-                    if (!isLandscape) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-                            modifier = Modifier.clickable {
-                                useSoftwareKeyboard = !useSoftwareKeyboard
-                                if (!useSoftwareKeyboard) {
-                                    keyboardController?.hide()
-                                }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                        modifier = Modifier.clickable {
+                            isSoftKeyboardVisible = !isSoftKeyboardVisible
+                            if (isSoftKeyboardVisible) {
+                                try { focusRequester.requestFocus() } catch (_: Exception) {}
+                                keyboardController?.show()
+                            } else {
+                                keyboardController?.hide()
                             }
-                        ) {
-                            Text(
-                                text = if (useSoftwareKeyboard) "সফট কিবোর্ড বন্ধ" else "সফট কিবোর্ড চালু",
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 11.sp,
-                                color = CyanAccent
-                            )
                         }
-                    } else {
-                        // In landscape mode: explicitly show that keyboard is auto-hidden for physical typing
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardHide,
-                                contentDescription = "Keyboard Auto-Hidden",
-                                tint = EmeraldSuccess,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "কিবোর্ড হাইড",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp,
-                                color = EmeraldSuccess,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                    ) {
+                        Text(
+                            text = if (isSoftKeyboardVisible) "⌨️ কিবোর্ড লুকান" else "⌨️ সফট কিবোর্ড",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 11.sp,
+                            color = CyanAccent
+                        )
                     }
                 }
             }
@@ -421,13 +441,13 @@ fun LiveTypingDisplay(
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "প্রথম থেকেই নির্দিষ্ট গতিতে স্ক্রোল করতে লক্ষ্যমাত্রা (WPM) সিলেক্ট করুন অথবা লেখার সাথে সাথে এক লাইন করে স্ক্রোল করতে 'টাইপিং অনুসারী' রাখুন:",
+                            text = "প্রথম থেকেই নির্দিষ্ট গতিতে স্ক্রোল করতে লক্ষ্যমাত্রা (WPM) সিলেক্ট করুন অথবা লেখার সাথে সাথে এক লাইন করে স্ক্রোল করতে 'টাইপিং অনুযায়ী' রাখুন:",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         listOf(
-                            0 to "টাইপিং অনুসারী (স্বাভাবিক গতি)",
+                            0 to "টাইপিং অনুযায়ী (স্বাভাবিক গতি)",
                             20 to "২০ WPM (প্রাথমিক লক্ষ্য)",
                             25 to "২৫ WPM (সরকারি চাকরি লক্ষ্যমাত্রা)",
                             30 to "৩০ WPM (স্ট্যান্ডার্ড লক্ষ্যমাত্রা)",
@@ -558,8 +578,10 @@ fun LiveTypingDisplay(
                     onBackspace()
                     return@onPreviewKeyEvent true
                 } else if (keyEvent.key == Key.Spacebar) {
-                    onPhysicalKey(' ')
-                    return@onPreviewKeyEvent true
+                    if (isBanglaBijoy) {
+                        onPhysicalKey(' ')
+                        return@onPreviewKeyEvent true
+                    }
                 } else if (keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter) {
                     onPhysicalKey('\n')
                     return@onPreviewKeyEvent true
@@ -567,7 +589,12 @@ fun LiveTypingDisplay(
                     val unicodeChar = nativeEvent.getUnicodeChar(nativeEvent.metaState)
                     if (unicodeChar != 0) {
                         val char = unicodeChar.toChar()
-                        if (char in 'a'..'z' || char in 'A'..'Z' || char in "0123456789.,;:'\"/\\`~!@#$%^&*()-=_+[]{}|<>?\n") {
+                        val isBengali = char in '\u0980'..'\u09FF'
+                        val isPrintable = char in 'a'..'z' || char in 'A'..'Z' || char in "0123456789.,;:'\"/\\`~!@#$%^&*()-=_+[]{}|<>?\n "
+                        if (isBengali) {
+                            onPhysicalKey(char)
+                            return@onPreviewKeyEvent true
+                        } else if (isBanglaBijoy && isPrintable) {
                             onPhysicalKey(char)
                             return@onPreviewKeyEvent true
                         }
@@ -586,17 +613,12 @@ fun LiveTypingDisplay(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(if (isLandscape) 250.dp else 360.dp)
-                    .focusRequester(focusRequester)
-                    .focusable()
                     .clickable {
                         try {
                             focusRequester.requestFocus()
                         } catch (_: Exception) {}
-                        if (isLandscape || !useSoftwareKeyboard) {
-                            keyboardController?.hide()
-                        }
+                        keyboardController?.show()
                     }
-                    .then(onKeyModifier)
                     .testTag("typing_paper_fullscreen_box"),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -646,33 +668,41 @@ fun LiveTypingDisplay(
                             .fillMaxWidth()
                             .verticalScroll(typedScrollState)
                     ) {
-                        if (userInput.isEmpty()) {
-                            Text(
-                                text = "📄 বাইরে রাখা প্রশ্ন বা কাগজ দেখে এখানে সরাসরি টাইপ করুন...\n(সম্পূর্ণ স্ক্রিন লেখার বক্স, কিবোর্ড থেকে টাইপ করুন, Enter চাপলে নতুন লাইনে যাবে)",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                lineHeight = 30.sp
-                            )
-                        } else {
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = userInput,
-                                    fontSize = if (isLandscape) 20.sp else 22.sp,
-                                    lineHeight = if (isLandscape) 32.sp else 36.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f, fill = false)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                // Blinking Cursor
-                                Box(
-                                    modifier = Modifier
-                                        .size(width = 3.dp, height = 22.dp)
-                                        .clip(RoundedCornerShape(2.dp))
-                                        .background(CyanAccent)
-                                )
+                        BasicTextField(
+                            value = userInput,
+                            onValueChange = onValueChange,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .focusRequester(focusRequester)
+                                .then(onKeyModifier),
+                            textStyle = TextStyle(
+                                fontSize = if (isLandscape) 20.sp else 22.sp,
+                                lineHeight = if (isLandscape) 32.sp else 36.sp,
+                                fontFamily = sharedFontFamily,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            cursorBrush = SolidColor(CyanAccent),
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.None,
+                                autoCorrectEnabled = false,
+                                keyboardType = KeyboardType.Text,
+                                imeAction = ImeAction.Default
+                            ),
+                            decorationBox = { innerTextField ->
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    if (userInput.isEmpty()) {
+                                        Text(
+                                            text = "📄 বাইরে রাখা প্রশ্ন বা কাগজ দেখে এখানে সরাসরি টাইপ করুন...\n(সম্পূর্ণ স্ক্রিন লেখার বক্স, কিবোর্ড থেকে টাইপ করুন, Enter চাপলে নতুন লাইনে যাবে)",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                            lineHeight = 30.sp
+                                        )
+                                    }
+                                    innerTextField()
+                                }
                             }
-                        }
+                        )
                     }
                 }
             }
@@ -761,15 +791,12 @@ fun LiveTypingDisplay(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .focusRequester(focusRequester)
-                        .focusable()
                         .clickable {
                             try {
                                 focusRequester.requestFocus()
                             } catch (_: Exception) {}
-                            keyboardController?.hide()
+                            keyboardController?.show()
                         }
-                        .then(onKeyModifier)
                         .testTag("typing_active_box"),
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -810,27 +837,44 @@ fun LiveTypingDisplay(
                                 .fillMaxWidth()
                                 .verticalScroll(typedScrollState)
                         ) {
-                            if (userInput.isEmpty()) {
-                                Text(
-                                    text = if (isBanglaBijoy) "এক্সটার্নাল কিবোর্ড দিয়ে লিখুন (J=ক, Shift+J=খ)..." else "টাইপিং শুরু করুন...",
-                                    fontSize = sharedFontSize,
-                                    lineHeight = sharedLineHeight,
-                                    letterSpacing = sharedLetterSpacing,
-                                    fontFamily = sharedFontFamily,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                )
-                            } else {
-                                Text(
-                                    text = typedAnnotatedString,
+                            BasicTextField(
+                                value = userInput,
+                                onValueChange = onValueChange,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .focusRequester(focusRequester)
+                                    .then(onKeyModifier),
+                                textStyle = TextStyle(
                                     fontSize = sharedFontSize,
                                     lineHeight = sharedLineHeight,
                                     letterSpacing = sharedLetterSpacing,
                                     fontFamily = sharedFontFamily,
                                     fontWeight = sharedFontWeight,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
+                                    color = MaterialTheme.colorScheme.onSurface
+                                ),
+                                cursorBrush = SolidColor(if (isBanglaBijoy) IndigoPrimary else CyanAccent),
+                                keyboardOptions = KeyboardOptions(
+                                    capitalization = KeyboardCapitalization.None,
+                                    autoCorrectEnabled = false,
+                                    keyboardType = KeyboardType.Text,
+                                    imeAction = ImeAction.Default
+                                ),
+                                decorationBox = { innerTextField ->
+                                    Box(modifier = Modifier.fillMaxWidth()) {
+                                        if (userInput.isEmpty()) {
+                                            Text(
+                                                text = if (isBanglaBijoy) "এক্সটার্নাল কিবোর্ড দিয়ে লিখুন (J=ক, Shift+J=খ)..." else "টাইপিং শুরু করুন...",
+                                                fontSize = sharedFontSize,
+                                                lineHeight = sharedLineHeight,
+                                                letterSpacing = sharedLetterSpacing,
+                                                fontFamily = sharedFontFamily,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                }
+                            )
                         }
                     }
                 }
@@ -850,7 +894,6 @@ fun LiveTypingDisplay(
                         try {
                             focusRequester.requestFocus()
                         } catch (_: Exception) {}
-                        if (!useSoftwareKeyboard) keyboardController?.hide()
                     }
                     .testTag("typing_display_card"),
                 shape = RoundedCornerShape(16.dp),
@@ -916,15 +959,12 @@ fun LiveTypingDisplay(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(230.dp)
-                    .focusRequester(focusRequester)
-                    .focusable()
                     .clickable {
                         try {
                             focusRequester.requestFocus()
                         } catch (_: Exception) {}
-                        if (!useSoftwareKeyboard) keyboardController?.hide()
+                        keyboardController?.show()
                     }
-                    .then(onKeyModifier)
                     .testTag("typing_active_box"),
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -965,70 +1005,46 @@ fun LiveTypingDisplay(
                             .fillMaxWidth()
                             .verticalScroll(typedScrollState)
                     ) {
-                        if (userInput.isEmpty()) {
-                            Text(
-                                text = if (isBanglaBijoy) "এক্সটার্নাল কিবোর্ড থেকে সরাসরি টাইপ করুন (J=ক, Shift+J=খ)..." else "টাইপিং শুরু করুন...",
-                                fontSize = sharedFontSize,
-                                lineHeight = sharedLineHeight,
-                                letterSpacing = sharedLetterSpacing,
-                                fontFamily = sharedFontFamily,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                        } else {
-                            Text(
-                                text = typedAnnotatedString,
+                        BasicTextField(
+                            value = userInput,
+                            onValueChange = onValueChange,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .focusRequester(focusRequester)
+                                .then(onKeyModifier),
+                            textStyle = TextStyle(
                                 fontSize = sharedFontSize,
                                 lineHeight = sharedLineHeight,
                                 letterSpacing = sharedLetterSpacing,
                                 fontFamily = sharedFontFamily,
                                 fontWeight = sharedFontWeight,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            cursorBrush = SolidColor(if (isBanglaBijoy) IndigoPrimary else CyanAccent),
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.None,
+                                autoCorrectEnabled = false,
+                                keyboardType = KeyboardType.Text,
+                                imeAction = ImeAction.Default
+                            ),
+                            decorationBox = { innerTextField ->
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    if (userInput.isEmpty()) {
+                                        Text(
+                                            text = if (isBanglaBijoy) "এক্সটার্নাল কিবোর্ড থেকে সরাসরি টাইপ করুন (J=ক, Shift+J=খ)..." else "টাইপিং শুরু করুন...",
+                                            fontSize = sharedFontSize,
+                                            lineHeight = sharedLineHeight,
+                                            letterSpacing = sharedLetterSpacing,
+                                            fontFamily = sharedFontFamily,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
+                        )
                     }
                 }
-            }
-        }
-
-        // 6. Optional Soft Keyboard BasicTextField (Only rendered in portrait if user toggled on-screen keyboard)
-        if (useSoftwareKeyboard && !isLandscape) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
-            ) {
-                BasicTextField(
-                    value = userInput,
-                    onValueChange = onValueChange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(42.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
-                        .focusRequester(softKeyboardFocusRequester),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onSurface
-                    ),
-                    cursorBrush = SolidColor(CyanAccent),
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Done,
-                        autoCorrectEnabled = false
-                    ),
-                    decorationBox = { inner ->
-                        Box(contentAlignment = Alignment.CenterStart) {
-                            if (userInput.isEmpty()) {
-                                Text(
-                                    text = "সফটওয়্যার কিবোর্ড দিয়ে লিখুন...",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            inner()
-                        }
-                    }
-                )
             }
         }
     }

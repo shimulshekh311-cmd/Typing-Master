@@ -22,14 +22,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -89,6 +92,10 @@ fun TypingSessionScreen(
     val liveWpm by viewModel.liveWpm.collectAsStateWithLifecycle()
     val liveAccuracy by viewModel.liveAccuracy.collectAsStateWithLifecycle()
     val mistakeCount by viewModel.mistakeCount.collectAsStateWithLifecycle()
+    val correctWordsCount by viewModel.correctWordsCount.collectAsStateWithLifecycle()
+    val incorrectWordsCount by viewModel.incorrectWordsCount.collectAsStateWithLifecycle()
+    val liveErrorRatePercent by viewModel.liveErrorRatePercent.collectAsStateWithLifecycle()
+    val isLiveFailingGovtRule by viewModel.isLiveFailingGovtRule.collectAsStateWithLifecycle()
     val completedResult by viewModel.lastCompletedResult.collectAsStateWithLifecycle()
     val showInterstitialAd by viewModel.showInterstitialAd.collectAsStateWithLifecycle()
     val selectedLanguage by viewModel.selectedLanguage.collectAsStateWithLifecycle()
@@ -211,6 +218,10 @@ fun TypingSessionScreen(
                 targetScrollWpm = targetScrollWpm,
                 onSetTargetScrollWpm = { viewModel.setTargetScrollWpm(it) },
                 onTogglePaperMode = { viewModel.togglePaperMode() },
+                correctWordsCount = correctWordsCount,
+                incorrectWordsCount = incorrectWordsCount,
+                liveErrorRatePercent = liveErrorRatePercent,
+                isLiveFailingGovtRule = isLiveFailingGovtRule,
                 focusRequester = focusRequester,
                 onValueChange = { viewModel.onUserInputChange(it) },
                 onPhysicalKey = { char -> viewModel.handlePhysicalKey(char) },
@@ -281,19 +292,37 @@ fun TypingSessionScreen(
 
     // Completion Results Dialog & Confetti Celebration
     if (completedResult != null) {
-        com.example.ui.components.ConfettiCelebration()
         val res = completedResult!!
-        val rank = when {
-            res.wpm >= 50 && res.accuracy >= 95f -> "S"
-            res.wpm >= 35 && res.accuracy >= 90f -> "A"
-            res.wpm >= 20 && res.accuracy >= 80f -> "B"
-            else -> "C"
+        val isPassedGovt = res.isPassedGovtRule
+        val isErrorTooHigh = res.errorRatePercent > 5.0f
+        val isSpeedTooLow = res.wpm < 20
+
+        if (isPassedGovt) {
+            com.example.ui.components.ConfettiCelebration()
         }
-        val rankColor = when (rank) {
-            "S" -> AmberWarning
-            "A" -> CyanAccent
-            "B" -> IndigoPrimary
-            else -> MaterialTheme.colorScheme.onSurfaceVariant
+
+        val statusColor = when {
+            isErrorTooHigh -> RoseError
+            isSpeedTooLow -> AmberWarning
+            else -> EmeraldSuccess
+        }
+
+        val statusTitle = when {
+            isErrorTooHigh -> "ফেল (অকৃতকার্য)"
+            isSpeedTooLow -> "অকৃতকার্য (গতি অপর্যাপ্ত)"
+            else -> "কৃতকার্য (PASSED)"
+        }
+
+        val statusIcon = when {
+            isErrorTooHigh -> Icons.Default.Cancel
+            isSpeedTooLow -> Icons.Default.Warning
+            else -> Icons.Default.CheckCircle
+        }
+
+        val statusDescription = when {
+            isErrorTooHigh -> "ভুলের হার ৫%-এর বেশি (${String.format(Locale.US, "%.1f", res.errorRatePercent)}%) — ২০২৪ সালের নিয়োগবিধির সংশোধিত গেজেট অনুযায়ী গতি অর্জিত হয়নি (ফেল)।"
+            isSpeedTooLow -> "ভুলের হার ৫% বা কম (${String.format(Locale.US, "%.1f", res.errorRatePercent)}%), কিন্তু পরীক্ষার জন্য প্রয়োজনীয় ন্যূনতম গতি (২০ WPM) অর্জিত হয়নি।"
+            else -> "অভিনন্দন! আপনি সরকারি নিয়োগ পরীক্ষার ৫% ভুলের নিয়ম এবং গতি সফলভাবে উত্তীর্ণ হয়েছেন।"
         }
 
         AlertDialog(
@@ -305,43 +334,59 @@ fun TypingSessionScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(
-                        imageVector = Icons.Default.EmojiEvents,
-                        contentDescription = "Complete",
-                        tint = AmberWarning,
+                        imageVector = statusIcon,
+                        contentDescription = statusTitle,
+                        tint = statusColor,
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "টাইপিং সম্পন্ন হয়েছে!",
+                        text = statusTitle,
                         fontWeight = FontWeight.ExtraBold,
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
+                        color = statusColor
                     )
                 }
             },
             text = {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Big Rank Circle
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .background(rankColor.copy(alpha = 0.15f))
-                            .border(2.dp, rankColor, CircleShape),
-                        contentAlignment = Alignment.Center
+                    // Government Assessment Verdict Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = statusColor.copy(alpha = 0.12f)),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, statusColor.copy(alpha = 0.8f))
                     ) {
-                        Text(
-                            text = rank,
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Black,
-                            color = rankColor
-                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = if (isErrorTooHigh) "❌ ৫% ভুলের নিয়মে ফেল" else (if (isSpeedTooLow) "⚠️ গতি কাঙ্ক্ষিত সীমার নিচে" else "✅ সরকারি নিয়োগ পরীক্ষায় উত্তীর্ণ"),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = statusColor
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = statusDescription,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
+                    // Speed & Accuracy Grid
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
@@ -356,7 +401,7 @@ fun TypingSessionScreen(
                                 text = "${res.wpm} WPM",
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = CyanAccent
+                                color = if (res.wpm >= 20) CyanAccent else RoseError
                             )
                         }
 
@@ -375,8 +420,9 @@ fun TypingSessionScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
+                    // Detailed breakdown card (5 Keystrokes = 1 Word, Error Rate %, Total/Correct/Incorrect Words)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
@@ -384,15 +430,128 @@ fun TypingSessionScreen(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         )
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(10.dp),
-                            horizontalArrangement = Arrangement.SpaceAround
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(text = "ভুল: ${res.mistakeCount}", style = MaterialTheme.typography.bodySmall)
-                            Text(text = "অক্ষর: ${res.totalCharsTyped}", style = MaterialTheme.typography.bodySmall)
-                            Text(text = "সময়: ${res.durationSeconds}s", style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                text = "সরকারি নিয়মে বিশ্লেষণ:",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            // Keystroke count: 5 keystrokes = 1 word
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "মোট কী-স্ট্রোক:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "${res.totalCharsTyped} টি (${res.totalCharsTyped / 5} শব্দ)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CyanAccent
+                                )
+                            }
+
+                            // Correct vs Incorrect words
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "সঠিক / ভুল শব্দ:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Row {
+                                    Text(
+                                        text = "${res.correctWords} সঠিক",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = EmeraldSuccess
+                                    )
+                                    Text(
+                                        text = "  |  ",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "${res.incorrectWords} ভুল",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (res.incorrectWords > 0) RoseError else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            // Error percentage vs Allowed 5% threshold
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "ভুলের শতকরা হার:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "${String.format(Locale.US, "%.1f", res.errorRatePercent)}% (অনুমোদিত সর্বোচ্চ ৫%)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (res.errorRatePercent > 5.0f) RoseError else EmeraldSuccess
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "সময়কাল:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "${res.durationSeconds} সেকেন্ড",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // 2024 Gazette Reference Card
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = CyanAccent,
+                                modifier = Modifier.size(16.dp).padding(top = 2.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "২০২৪ সালের নিয়োগবিধির সংশোধিত গেজেট: ৫টি কী-স্ট্রোক = ১টি শব্দ (২০ WPM = মিনিটে ১০০ কী-স্ট্রোক)। ৫%-এর বেশি ভুল হলে স্বয়ংক্রিয়ভাবে ফেল গণ্য হবে।",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -408,7 +567,7 @@ fun TypingSessionScreen(
                 ) {
                     Icon(imageVector = Icons.Default.Leaderboard, contentDescription = "Leaderboard", modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("লিডারবোর্ডে দেখুন", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                    Text("রেকর্ড দেখুন", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -422,7 +581,7 @@ fun TypingSessionScreen(
                     },
                     modifier = Modifier.testTag("result_dialog_try_again_button")
                 ) {
-                    Text("আবার চেষ্টা করুন")
+                    Text("আবার পরীক্ষা দিন")
                 }
             }
         )
